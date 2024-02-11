@@ -14,7 +14,7 @@ type PedalState struct {
 }
 
 func main() {
-	rl.InitWindow(800, 450, "raylib [core] example - basic window")
+	rl.InitWindow(800, 450, "Pedal")
 	defer rl.CloseWindow()
 
     workoutData := make([]*fit.WorkoutStepMsg, 0)
