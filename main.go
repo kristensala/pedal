@@ -5,7 +5,6 @@ import (
 	"pedal/cmd"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
-	"github.com/tormoder/fit"
 )
 
 
@@ -17,7 +16,7 @@ func main() {
 	rl.InitWindow(800, 450, "Pedal")
 	defer rl.CloseWindow()
 
-    workoutData := make([]*fit.WorkoutStepMsg, 0)
+    workoutData := make([]cmd.Step, 0)
     droppedFile := make([]string, 0)
 
 	rl.SetTargetFPS(60)
@@ -59,7 +58,7 @@ func validateWorkoutFile() {
 // todo:
 // render layout for graph and
 // display power and time and hr etc
-func renderWorkoutView(data []*fit.WorkoutStepMsg) {
+func renderWorkoutView(data []cmd.Step) {
     renderGraph(200)
 }
 

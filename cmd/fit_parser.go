@@ -16,7 +16,7 @@ type Step struct {
     TargetHigh uint32
 }
 
-func ParseWorkoutFile(fullFilePath string) []*fit.WorkoutStepMsg {
+func ParseWorkoutFile(fullFilePath string) []Step {
     file := filepath.Join(fullFilePath)
 
     data, err := os.ReadFile(file)
@@ -37,33 +37,10 @@ func ParseWorkoutFile(fullFilePath string) []*fit.WorkoutStepMsg {
         return nil
     }
 
+    result := buildSteps(workoutFile.WorkoutSteps)
+    fmt.Printf("%+v", result)
 
-    // laps
-    for _, step := range workoutFile.WorkoutSteps {
-        //fmt.Printf("%+v\n", step)
-
-        if step.DurationType.String() == "RepeatUntilStepsCmplt" {
-            fmt.Printf("%s, from step: %d; times: %d \n",
-                step.DurationType.String(),
-                step.DurationValue,
-                step.TargetValue)
-        }
-
-        if step.DurationType.String() == "Time" {
-            powerHighInter := step.CustomTargetValueHigh - 1000
-            powerLowInter := step.CustomTargetValueLow - 1000
-
-            fmt.Printf("Step duration: %f s ", step.GetDurationValue())
-            fmt.Printf("%d => %d - %d \n",
-                uint16(step.MessageIndex),
-                powerLowInter,
-                powerHighInter)
-
-        }
-    }
-
-
-    return workoutFile.WorkoutSteps
+    return result
 }
 
 func buildSteps(messages []*fit.WorkoutStepMsg) []Step{
