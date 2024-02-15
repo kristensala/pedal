@@ -35,44 +35,81 @@ func main() {
 		rl.BeginDrawing()
 
 		rl.ClearBackground(rl.RayWhite)
-		rl.DrawText("Drop a .FIT workout file here!",
-            190,
-            200,
-            20,
-            rl.LightGray)
 
         if (len(workoutData) > 0) {
             renderWorkoutView(workoutData)
+        } else {
+            rl.DrawText("Drop a .FIT workout file here!",
+                190,
+                200,
+                20,
+                rl.LightGray)
         }
 
 		rl.EndDrawing()
 	}
 }
 
-// needs to be a .fit workout file
-// not a workout summary
-func validateWorkoutFile() {
-
-}
-
-// todo:
-// render layout for graph and
-// display power and time and hr etc
 func renderWorkoutView(data []cmd.Step) {
-    renderGraph(200)
+    renderGraph(data, 200)
 }
 
+func renderGraph(data []cmd.Step, height float32) rl.Rectangle {
+    canvasX, canvasY := 0, float32(rl.GetScreenHeight()) - height
 
-// todo: get the fit workout file data to render the graph
-func renderGraph(height float32) rl.Rectangle {
     canvas := rl.Rectangle{
-        X: 0,
-        Y: float32(rl.GetScreenHeight()) - height,
+        X: float32(canvasX),
+        Y: canvasY,
         Height: height,
         Width: float32(rl.GetScreenWidth()),
     }
 
+    // draw canvas element (the parent element)
     rl.DrawRectangleRec(canvas, rl.Blue)
+
+    // TODO:
+    // test the steps (this is random testing currently)
+    // need to calculate correct pixle gap and use canvas
+    // as the parent element
+    // first set the high target and then low (otherwise 
+    // high will cover the smaller rectangle)
+    
+    // X is seconds (time)
+    // Y is power
+
+    // default baseline power is 200 so 50% canvas height is 200W
+    // knowing that max canvas height is 400w
+
+    // POWER distribution:
+    // if canvas height is 400px then 1w = 1px => 400px / 400W
+    // if canvas height = 500px then 1w = 500 / 400 and so on
+
+    // TIME distribution:
+    // Data needed: canvas width and total workout time in seconds
+    // calculation same as it is for power
+
+    // each step will be a simple rectangle
+
+    /*
+    firstStep := data[0]
+    stepOneOne := rl.Rectangle{
+        X: 0,
+        Y: float32(rl.GetScreenHeight()) - float32(firstStep.TargetHigh),
+        Height: float32(firstStep.TargetHigh),
+        Width: 100,
+    }
+    rl.DrawRectangleRec(stepOneOne, rl.Green)
+
+    stepOne := rl.Rectangle{
+        X: 0,
+        Y: float32(rl.GetScreenHeight()) - float32(firstStep.TargetLow),
+        Height: float32(firstStep.TargetLow),
+        Width: 100,
+    }
+    rl.DrawRectangleRec(stepOne, rl.Yellow)
+    */
+
 
     return canvas
 }
+

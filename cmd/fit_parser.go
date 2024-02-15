@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,9 +10,18 @@ import (
 	"github.com/tormoder/fit"
 )
 
+// TODO:
+// get the total duration of the workout
+
+type DataSet struct {
+    TotalDurationSeconds float64
+    ThresholdPower uint32
+    Steps []Step
+}
+
 type Step struct {
     Number uint16
-    DurationSeconds uint32
+    DurationSeconds float64
     TargetLow uint32
     TargetHigh uint32
 }
@@ -38,17 +48,19 @@ func ParseWorkoutFile(fullFilePath string) []Step {
     }
 
     result := buildSteps(workoutFile.WorkoutSteps)
-    fmt.Printf("%+v", result)
+
+    resultJson, _ := json.MarshalIndent(result, ""," ")
+    fmt.Println(string(resultJson))
 
     return result
 }
 
-func buildSteps(messages []*fit.WorkoutStepMsg) []Step{
+func buildSteps(messages []*fit.WorkoutStepMsg) []Step {
     steps := []Step{}
 
     for _, stepMsg := range messages {
         if stepMsg.DurationType.String() == "Time" {
-            duration := stepMsg.DurationValue
+            duration := float64(stepMsg.DurationValue)
             powerHigh := stepMsg.CustomTargetValueHigh - 1000
             powerLow := stepMsg.CustomTargetValueLow - 1000
 
