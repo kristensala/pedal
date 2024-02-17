@@ -97,14 +97,17 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
         lowEndBlock := rl.Rectangle{
             X: float32(blockX),
             Y: canvas.Y + canvas.Height - float32(blockLowEndHeight),
-            Height: float32(blockHighEndHeight),
+            Height: float32(blockLowEndHeight),
             Width: float32(blockWidth),
         }
-        rl.DrawRectangleRec(lowEndBlock, rl.LightGray)
+        rl.DrawRectangleRec(lowEndBlock, rl.LightGray) //fix: better colors
 
         blockX = blockX + blockWidth
     }
 
     return canvas
+}
+
+func renderNeedel() {
 }
 
