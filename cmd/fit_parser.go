@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,57 +13,67 @@ import (
 // get the total duration of the workout
 
 type DataSet struct {
-    TotalDurationSeconds float64
+    TotalDurationSeconds int
     ThresholdPower uint32
-    Steps []Step
+    Blocks []Block
 }
 
-type Step struct {
+type Block struct {
     Number uint16
-    DurationSeconds float64
+    DurationSeconds uint32
     TargetLow uint32
     TargetHigh uint32
 }
 
-func ParseWorkoutFile(fullFilePath string) []Step {
+func ParseWorkoutFile(fullFilePath string) DataSet {
+    dataSet := DataSet{}
+
     file := filepath.Join(fullFilePath)
 
     data, err := os.ReadFile(file)
     if err != nil {
         fmt.Println(err)
-        return nil
+        return dataSet
     }
 
     fit, err := fit.Decode(bytes.NewReader(data))
     if err != nil {
         fmt.Println(err)
-        return nil
+        return dataSet
     }
 
     workoutFile, err := fit.Workout()
     if err != nil {
         fmt.Println(err)
-        return nil
+        return dataSet
     }
 
-    result := buildSteps(workoutFile.WorkoutSteps)
 
-    resultJson, _ := json.MarshalIndent(result, ""," ")
-    fmt.Println(string(resultJson))
+    result := buildBlocks(workoutFile.WorkoutSteps)
+    totalDuration := getTotalDurationInSeconds(result)
 
-    return result
+    dataSet = DataSet{
+        TotalDurationSeconds: totalDuration,
+        Blocks: result,
+        ThresholdPower: 200,
+    }
+
+    /*resultJson, _ := json.MarshalIndent(dataSet, ""," ")
+    fmt.Println(string(resultJson))*/
+
+    return dataSet
 }
 
-func buildSteps(messages []*fit.WorkoutStepMsg) []Step {
-    steps := []Step{}
+func buildBlocks(messages []*fit.WorkoutStepMsg) []Block {
+    steps := []Block{}
 
     for _, stepMsg := range messages {
         if stepMsg.DurationType.String() == "Time" {
-            duration := float64(stepMsg.DurationValue)
+            duration := stepMsg.DurationValue / 1000
             powerHigh := stepMsg.CustomTargetValueHigh - 1000
             powerLow := stepMsg.CustomTargetValueLow - 1000
 
-            newStep := Step{
+            newStep := Block{
                 Number: uint16(stepMsg.MessageIndex),
                 DurationSeconds: duration,
                 TargetLow: powerLow,
@@ -87,5 +96,15 @@ func buildSteps(messages []*fit.WorkoutStepMsg) []Step {
     }
 
     return steps
+}
+
+func getTotalDurationInSeconds(blocks []Block) int {
+    totalDuration := 0
+
+    for _, b := range blocks {
+        totalDuration = totalDuration + int(b.DurationSeconds)
+    }
+
+    return totalDuration
 }
 
