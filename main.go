@@ -107,9 +107,21 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
         blockX = blockX + blockWidth
     }
 
-    return canvas
-}
 
-func renderNeedel() {
+    // Needel
+    // note: X changes on every second
+    // and based on X I have to get the current block
+    startPos := rl.Vector2{
+        X: 100,
+        Y: canvas.Y,
+    }
+    endPos := rl.Vector2{
+        X: 100,
+        Y: canvas.Y + canvas.Height,
+    }
+
+    rl.DrawLineV(startPos, endPos, rl.Red)
+
+    return canvas
 }
 
