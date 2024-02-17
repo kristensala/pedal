@@ -78,7 +78,8 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     
     blockX := 0.0
     for _, b := range data.Blocks {
-        blockHeight := float64(b.TargetHigh) * powerGap
+        blockHighEndHeight := float64(b.TargetHigh) * powerGap
+        blockLowEndHeight := float64(b.TargetLow) * powerGap
         blockWidth := float64(b.DurationSeconds) * timeGap
 
         // blocks are dependent of the canvas position
@@ -87,12 +88,19 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
         // or at least should
         block := rl.Rectangle{
             X: float32(blockX),
-            Y: canvas.Y + canvas.Height - float32(blockHeight),
-            Height: float32(blockHeight),
+            Y: canvas.Y + canvas.Height - float32(blockHighEndHeight),
+            Height: float32(blockHighEndHeight),
             Width: float32(blockWidth),
         }
-
         rl.DrawRectangleRec(block, rl.Yellow)
+
+        lowEndBlock := rl.Rectangle{
+            X: float32(blockX),
+            Y: canvas.Y + canvas.Height - float32(blockLowEndHeight),
+            Height: float32(blockHighEndHeight),
+            Width: float32(blockWidth),
+        }
+        rl.DrawRectangleRec(lowEndBlock, rl.LightGray)
 
         blockX = blockX + blockWidth
     }
