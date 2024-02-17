@@ -56,7 +56,9 @@ func renderWorkoutView(data cmd.DataSet) {
         20,
         rl.Green)
 
-    renderGraph(data, 200)
+    // canvas is always 50% of the screen height
+    canvasHeight := float32(rl.GetScreenHeight()) * float32(0.5)
+    renderGraph(data, canvasHeight)
 }
 
 func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
@@ -74,7 +76,7 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
 
     // calculate 1s and 1w pixels
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
-    powerGap := float64(canvas.Height) / 600
+    powerGap := float64(canvas.Height) / 600 // 600W is max power to display
     
     blockX := 0.0
     for _, b := range data.Blocks {
