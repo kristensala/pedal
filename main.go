@@ -7,47 +7,52 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-
-type PedalState struct {
-    currentWorkoutFile string
+type AppState struct {
+    dataSet cmd.DataSet
 }
 
 // Get the current workout state
-var needlePositionOnCanvas float64 = 0
-var needleIncrementOnCanvas float64 = 0
+// through the needle pos
+var needlePosX float64 = 0
+var needlePosPercent float64 = 0
+var needleIncrementX float64 = 0
 var currentWorkoutBlockNr int = 0
-var blockChangeAtSecond = 0
+var workoutBlockChangeAtSecond = 0
 
 func main() {
 	rl.InitWindow(800, 450, "Pedal")
 	defer rl.CloseWindow()
 
-    workoutData := cmd.DataSet{}
     droppedFile := make([]string, 0)
+    appState := AppState{}
 
 	rl.SetTargetFPS(60)
 
+
 	for !rl.WindowShouldClose() {
+
         if (rl.IsFileDropped()) {
             droppedFile = rl.LoadDroppedFiles()
 
             if (len(droppedFile) > 0) {
-                workoutData = cmd.ParseWorkoutFile(droppedFile[0])
+                appState.dataSet = cmd.ParseWorkoutFile(droppedFile[0])
                 rl.UnloadDroppedFiles()
             }
         }
 
+        // note: to test manually
         if (rl.IsKeyDown(rl.KeyRight)) {
-            needlePositionOnCanvas = needlePositionOnCanvas + needleIncrementOnCanvas
-            getBlockBasedOnNeedlePos(workoutData)
+            needlePosX = needlePosX + needleIncrementX
+            needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
+            getBlockBasedOnNeedlePos(appState.dataSet)
         }
 
 		rl.BeginDrawing()
 
 		rl.ClearBackground(rl.RayWhite)
 
-        if (len(workoutData.Blocks) > 0) {
-            renderWorkoutView(workoutData)
+        if (len(appState.dataSet.Blocks) > 0) {
+            appState.renderWorkoutView()
         } else {
             rl.DrawText("Drop a .FIT workout file here!",
                 190,
@@ -60,8 +65,8 @@ func main() {
 	}
 }
 
-func renderWorkoutView(data cmd.DataSet) {
-    rl.DrawText(fmt.Sprint(data.TotalDurationSeconds),
+func (state AppState) renderWorkoutView() {
+    rl.DrawText(fmt.Sprint(state.dataSet.TotalDurationSeconds),
         190,
         200,
         20,
@@ -69,10 +74,27 @@ func renderWorkoutView(data cmd.DataSet) {
 
     // canvas is always 50% of the screen height
     canvasHeight := float32(rl.GetScreenHeight()) * float32(0.5)
-    renderGraph(data, canvasHeight)
+    canvas := renderCanvas(state.dataSet, canvasHeight)
+
+    // makes sure that on window resize 
+    // the needle is in the correct poisition
+    // Assumes that canvas width is window width
+    needlePosX = (float64(needlePosPercent) * float64(canvas.Width)) / 100
+
+    // Draw the Needle
+    startPos := rl.Vector2{
+        X: float32(needlePosX),
+        Y: canvas.Y,
+    }
+    endPos := rl.Vector2{
+        X: float32(needlePosX),
+        Y: canvas.Y + canvas.Height,
+    }
+
+    rl.DrawLineV(startPos, endPos, rl.Red)
 }
 
-func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
+func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
     canvasX, canvasY := 0, float32(rl.GetScreenHeight()) - height
 
     canvas := rl.Rectangle{
@@ -89,7 +111,7 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
     powerGap := float64(canvas.Height) / 600 // 600W is max power to display
 
-    needleIncrementOnCanvas = timeGap
+    needleIncrementX = timeGap
     
     blockX := 0.0
     for _, b := range data.Blocks {
@@ -120,21 +142,6 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
         blockX = blockX + blockWidth
     }
 
-
-    // Needle
-    // note: X changes on every second
-    // and based on X I have to get the current block
-    startPos := rl.Vector2{
-        X: float32(needlePositionOnCanvas),
-        Y: canvas.Y,
-    }
-    endPos := rl.Vector2{
-        X: float32(needlePositionOnCanvas),
-        Y: canvas.Y + canvas.Height,
-    }
-
-    rl.DrawLineV(startPos, endPos, rl.Red)
-
     return canvas
 }
 
@@ -142,7 +149,7 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
 // Dataset; Needle pos and needle increment; total duration in seconds
 func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
     // gives me the actual second we are on
-    trueNeedlePos := uint32(needlePositionOnCanvas / needleIncrementOnCanvas)
+    trueNeedlePos := uint32(needlePosX / needleIncrementX)
 
     if (len(dataSet.Blocks) == 0) {
         return
@@ -154,10 +161,10 @@ func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
     fmt.Printf("%d; %d ;", int(trueNeedlePos), block.DurationSeconds)
 
     if (currentWorkoutBlockNr == 0) {
-        blockChangeAtSecond = int(block.DurationSeconds)
+        workoutBlockChangeAtSecond = int(block.DurationSeconds)
     }
 
-    if (trueNeedlePos > uint32(blockChangeAtSecond)) {
+    if (trueNeedlePos > uint32(workoutBlockChangeAtSecond)) {
         currentWorkoutBlockNr = currentWorkoutBlockNr + 1
 
         // TODO: send some sort of a signal
@@ -168,12 +175,11 @@ func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
 
         newBlock := dataSet.Blocks[currentWorkoutBlockNr]
         
-        blockChangeAtSecond = int(trueNeedlePos) + int(newBlock.DurationSeconds)
-        fmt.Printf("next block starts at: %d second\n", blockChangeAtSecond)
+        workoutBlockChangeAtSecond = int(trueNeedlePos) + int(newBlock.DurationSeconds)
+        fmt.Printf("next block starts at: %d second\n", workoutBlockChangeAtSecond)
 
     } else {
         fmt.Println(block.TargetLow)
     }
-
-
 }
+
