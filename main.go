@@ -13,8 +13,8 @@ type PedalState struct {
 }
 
 // Get the current workout state
-var needelPositionOnCanvas float64 = 0
-var needelIncrementOnCanvas float64 = 0
+var needlePositionOnCanvas float64 = 0
+var needleIncrementOnCanvas float64 = 0
 var currentWorkoutBlockNr int = 0
 var blockChangeAtSecond = 0
 
@@ -38,7 +38,7 @@ func main() {
         }
 
         if (rl.IsKeyDown(rl.KeyRight)) {
-            needelPositionOnCanvas = needelPositionOnCanvas + needelIncrementOnCanvas
+            needlePositionOnCanvas = needlePositionOnCanvas + needleIncrementOnCanvas
             getBlockBasedOnNeedlePos(workoutData)
         }
 
@@ -89,7 +89,7 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
     powerGap := float64(canvas.Height) / 600 // 600W is max power to display
 
-    needelIncrementOnCanvas = timeGap
+    needleIncrementOnCanvas = timeGap
     
     blockX := 0.0
     for _, b := range data.Blocks {
@@ -121,15 +121,15 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     }
 
 
-    // Needel
+    // Needle
     // note: X changes on every second
     // and based on X I have to get the current block
     startPos := rl.Vector2{
-        X: float32(needelPositionOnCanvas),
+        X: float32(needlePositionOnCanvas),
         Y: canvas.Y,
     }
     endPos := rl.Vector2{
-        X: float32(needelPositionOnCanvas),
+        X: float32(needlePositionOnCanvas),
         Y: canvas.Y + canvas.Height,
     }
 
@@ -139,10 +139,10 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
 }
 
 // Values needed
-// Dataset; Needel pos and needel increment; total duration in seconds
+// Dataset; Needle pos and needle increment; total duration in seconds
 func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
     // gives me the actual second we are on
-    trueNeedelPos := uint32(needelPositionOnCanvas / needelIncrementOnCanvas)
+    trueNeedlePos := uint32(needlePositionOnCanvas / needleIncrementOnCanvas)
 
     if (len(dataSet.Blocks) == 0) {
         return
@@ -151,13 +151,13 @@ func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
     // fix: do not index into array every time
     // save the block into some sort of an application state
     block := dataSet.Blocks[currentWorkoutBlockNr]
-    fmt.Printf("%d; %d ;", int(trueNeedelPos), block.DurationSeconds)
+    fmt.Printf("%d; %d ;", int(trueNeedlePos), block.DurationSeconds)
 
     if (currentWorkoutBlockNr == 0) {
         blockChangeAtSecond = int(block.DurationSeconds)
     }
 
-    if (trueNeedelPos > uint32(blockChangeAtSecond)) {
+    if (trueNeedlePos > uint32(blockChangeAtSecond)) {
         currentWorkoutBlockNr = currentWorkoutBlockNr + 1
 
         // TODO: send some sort of a signal
@@ -168,7 +168,7 @@ func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
 
         newBlock := dataSet.Blocks[currentWorkoutBlockNr]
         
-        blockChangeAtSecond = int(trueNeedelPos) + int(newBlock.DurationSeconds)
+        blockChangeAtSecond = int(trueNeedlePos) + int(newBlock.DurationSeconds)
         fmt.Printf("next block starts at: %d second\n", blockChangeAtSecond)
 
     } else {
