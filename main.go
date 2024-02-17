@@ -12,6 +12,12 @@ type PedalState struct {
     currentWorkoutFile string
 }
 
+// Get the current workout state
+var needelPositionOnCanvas float64 = 0
+var needelIncrementOnCanvas float64 = 0
+var currentWorkoutBlockNr int = 0
+var blockChangeAtSecond = 0
+
 func main() {
 	rl.InitWindow(800, 450, "Pedal")
 	defer rl.CloseWindow()
@@ -29,6 +35,11 @@ func main() {
                 workoutData = cmd.ParseWorkoutFile(droppedFile[0])
                 rl.UnloadDroppedFiles()
             }
+        }
+
+        if (rl.IsKeyDown(rl.KeyRight)) {
+            needelPositionOnCanvas = needelPositionOnCanvas + needelIncrementOnCanvas
+            getBlockBasedOnNeedlePos(workoutData)
         }
 
 		rl.BeginDrawing()
@@ -77,6 +88,8 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     // calculate 1s and 1w pixels
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
     powerGap := float64(canvas.Height) / 600 // 600W is max power to display
+
+    needelIncrementOnCanvas = timeGap
     
     blockX := 0.0
     for _, b := range data.Blocks {
@@ -112,11 +125,11 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     // note: X changes on every second
     // and based on X I have to get the current block
     startPos := rl.Vector2{
-        X: 100,
+        X: float32(needelPositionOnCanvas),
         Y: canvas.Y,
     }
     endPos := rl.Vector2{
-        X: 100,
+        X: float32(needelPositionOnCanvas),
         Y: canvas.Y + canvas.Height,
     }
 
@@ -125,3 +138,42 @@ func renderGraph(data cmd.DataSet, height float32) rl.Rectangle {
     return canvas
 }
 
+// Values needed
+// Dataset; Needel pos and needel increment; total duration in seconds
+func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
+    // gives me the actual second we are on
+    trueNeedelPos := uint32(needelPositionOnCanvas / needelIncrementOnCanvas)
+
+    if (len(dataSet.Blocks) == 0) {
+        return
+    }
+
+    // fix: do not index into array every time
+    // save the block into some sort of an application state
+    block := dataSet.Blocks[currentWorkoutBlockNr]
+    fmt.Printf("%d; %d ;", int(trueNeedelPos), block.DurationSeconds)
+
+    if (currentWorkoutBlockNr == 0) {
+        blockChangeAtSecond = int(block.DurationSeconds)
+    }
+
+    if (trueNeedelPos > uint32(blockChangeAtSecond)) {
+        currentWorkoutBlockNr = currentWorkoutBlockNr + 1
+
+        // TODO: send some sort of a signal
+        if (currentWorkoutBlockNr > len(dataSet.Blocks)) {
+            fmt.Println("workout ENDED")
+            return;
+        }
+
+        newBlock := dataSet.Blocks[currentWorkoutBlockNr]
+        
+        blockChangeAtSecond = int(trueNeedelPos) + int(newBlock.DurationSeconds)
+        fmt.Printf("next block starts at: %d second\n", blockChangeAtSecond)
+
+    } else {
+        fmt.Println(block.TargetLow)
+    }
+
+
+}
