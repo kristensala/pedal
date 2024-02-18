@@ -10,6 +10,7 @@ import (
 
 type AppState struct {
     dataSet cmd.DataSet
+    screen CurrentScreen
 }
 
 // Get the current workout state
@@ -22,12 +23,20 @@ var (
     workoutBlockChangeAtSecond = 0
 )
 
+type CurrentScreen int
+const (
+    TitleScreen CurrentScreen = iota
+    WorkoutScreen
+)
+
 func main() {
     const windowHeight = 450
     const windowWidth = 800
 
     droppedFile := make([]string, 0)
-    appState := AppState{}
+    appState := AppState{
+        screen: TitleScreen,
+    }
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
 	defer rl.CloseWindow()
@@ -40,33 +49,55 @@ func main() {
         (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
 
 	for !rl.WindowShouldClose() {
-        if (rl.IsFileDropped()) {
-            droppedFile = rl.LoadDroppedFiles()
+        // Update
+        //------------------------------------
+        switch appState.screen {
+        case TitleScreen: {
+            if (rl.IsFileDropped()) {
+                droppedFile = rl.LoadDroppedFiles()
 
-            if (len(droppedFile) > 0) {
-                appState.dataSet = cmd.ParseWorkoutFile(droppedFile[0])
-                rl.UnloadDroppedFiles()
+                if (len(droppedFile) > 0) {
+                    appState.dataSet = cmd.ParseWorkoutFile(droppedFile[0])
+                    appState.screen = WorkoutScreen
+                    rl.UnloadDroppedFiles()
+                }
             }
+            break;
         }
-
-        // note: to move the needle manually
-        if (rl.IsKeyDown(rl.KeyRight)) {
-            needlePosX = needlePosX + needleIncrementX
-            needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
-            getBlockBasedOnNeedlePos(appState.dataSet)
+        case WorkoutScreen: {
+            // note: to move the needle manually
+            if (rl.IsKeyDown(rl.KeyRight)) {
+                needlePosX = needlePosX + needleIncrementX
+                needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
+                getBlockBasedOnNeedlePos(appState.dataSet)
+            }
+            break;
         }
+        default: break;
+        }
+        //------------------------------------
 
+        // Draw
+        //------------------------------------
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-        if (len(appState.dataSet.Blocks) > 0) {
-            appState.drawWorkoutCanvas()
-        } else {
+        switch appState.screen {
+        case TitleScreen: {
             rl.DrawText("Drop a .FIT workout file here!",
                 190,
                 200,
                 20,
                 rl.LightGray)
+            break;
+        }
+        case WorkoutScreen: {
+            if (len(appState.dataSet.Blocks) > 0) {
+                appState.drawWorkoutCanvas()
+            }
+            break;
+        }
+        default: break;
         }
 
 		rl.EndDrawing()
