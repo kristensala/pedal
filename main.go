@@ -22,7 +22,9 @@ var (
     needlePosPercent float64 = 0
     needleIncrementX float64 = 0
     currentWorkoutBlockNr int = 0
+    currentWorkoutBlock cmd.Block
     workoutBlockChangeAtSecond = 0
+    workoutElapsedTime uint32 = 0
 )
 
 type ApplicationScreen int
@@ -101,6 +103,24 @@ func main() {
 
         case WorkoutScreen:
             if (len(appState.dataSet.Blocks) > 0) {
+                rl.DrawText(fmt.Sprintf("Target power: %d - %d", currentWorkoutBlock.TargetLow, currentWorkoutBlock.TargetHigh),
+                    10,
+                    10,
+                    20,
+                    rl.Black)
+
+                rl.DrawText(fmt.Sprintf("Interval: %d", currentWorkoutBlock.DurationSeconds),
+                    10,
+                    30,
+                    20,
+                    rl.Black)
+
+                rl.DrawText(fmt.Sprintf("Elapsed time: %d", workoutElapsedTime),
+                    10,
+                    50,
+                    20,
+                    rl.Black)
+
                 appState.drawWorkoutCanvas()
             } else {
                 log.Print("Could not read any data from fit file")
@@ -222,7 +242,7 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
 // Dataset; Needle pos and needle increment; total duration in seconds
 func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
     // gives me the actual second we are on
-    trueNeedlePos := uint32(needlePosX / needleIncrementX)
+    workoutElapsedTime = uint32(needlePosX / needleIncrementX)
 
     if (len(dataSet.Blocks) == 0) {
         return
@@ -230,29 +250,30 @@ func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
 
     // fix: do not index into array every time
     // save the block into some sort of an application state
-    block := dataSet.Blocks[currentWorkoutBlockNr]
-    fmt.Printf("%d; %d ;", int(trueNeedlePos), block.DurationSeconds)
+    currentWorkoutBlock = dataSet.Blocks[currentWorkoutBlockNr]
+    fmt.Printf("%d; %d ;", int(workoutElapsedTime), currentWorkoutBlock.DurationSeconds)
 
     if (currentWorkoutBlockNr == 0) {
-        workoutBlockChangeAtSecond = int(block.DurationSeconds)
+        workoutBlockChangeAtSecond = int(currentWorkoutBlock.DurationSeconds)
     }
 
-    if (trueNeedlePos > uint32(workoutBlockChangeAtSecond)) {
-        currentWorkoutBlockNr = currentWorkoutBlockNr + 1
+    if (workoutElapsedTime > uint32(workoutBlockChangeAtSecond)) {
+        currentWorkoutBlockNr += 1
 
         // TODO: send some sort of a signal
-        if (currentWorkoutBlockNr > len(dataSet.Blocks)) {
+        // save the workout
+        if (currentWorkoutBlockNr == len(dataSet.Blocks)) {
             fmt.Println("workout ENDED")
             return;
         }
 
         newBlock := dataSet.Blocks[currentWorkoutBlockNr]
         
-        workoutBlockChangeAtSecond = int(trueNeedlePos) + int(newBlock.DurationSeconds)
+        workoutBlockChangeAtSecond = int(workoutElapsedTime) + int(newBlock.DurationSeconds)
         fmt.Printf("next block starts at: %d second\n", workoutBlockChangeAtSecond)
 
     } else {
-        fmt.Println(block.TargetLow)
+        fmt.Println(currentWorkoutBlock.TargetLow)
     }
 }
 
