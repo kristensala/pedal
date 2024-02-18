@@ -7,12 +7,18 @@ import (
 	"pedal/cmd"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
-	//gui "github.com/gen2brain/raylib-go/raygui"
+	gui "github.com/gen2brain/raylib-go/raygui"
 )
 
 type AppState struct {
     dataSet cmd.DataSet
     screen ApplicationScreen
+}
+
+// local application settings
+// if needed
+type Settings struct {
+
 }
 
 // Get the current workout state
@@ -103,19 +109,29 @@ func main() {
 
         case WorkoutScreen:
             if (len(appState.dataSet.Blocks) > 0) {
-                rl.DrawText(fmt.Sprintf("Target power: %d - %d", currentWorkoutBlock.TargetLow, currentWorkoutBlock.TargetHigh),
+                gui.Button(rl.Rectangle{
+                    X: float32(rl.GetScreenWidth()) - (10 + 30),
+                    Y: 10,
+                    Width: 30,
+                    Height: 30,
+                }, gui.IconText(gui.ICON_GEAR_BIG, ""))
+
+                rl.DrawText(
+                    fmt.Sprintf("Target power: %d - %d", currentWorkoutBlock.TargetLow, currentWorkoutBlock.TargetHigh),
                     10,
                     10,
                     20,
                     rl.Black)
 
-                rl.DrawText(fmt.Sprintf("Interval: %d", currentWorkoutBlock.DurationSeconds),
+                rl.DrawText(
+                    fmt.Sprintf("Interval: %d", currentWorkoutBlock.DurationSeconds),
                     10,
                     30,
                     20,
                     rl.Black)
 
-                rl.DrawText(fmt.Sprintf("Elapsed time: %d", workoutElapsedTime),
+                rl.DrawText(
+                    fmt.Sprintf("Elapsed time: %d", workoutElapsedTime),
                     10,
                     50,
                     20,
