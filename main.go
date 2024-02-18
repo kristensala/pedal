@@ -52,14 +52,11 @@ func InitApp() (state AppState) {
 }
 
 func main() {
-    // Init
-    //-------------------------------------
     const (
         windowHeight = 450
         windowWidth = 800
     )
 
-    droppedFile := make([]string, 0)
     appState := InitApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
@@ -67,106 +64,105 @@ func main() {
 
 	rl.SetTargetFPS(60)
 
-    // works for my enormous screen
     rl.SetWindowPosition(
         (rl.GetMonitorWidth(0) - (windowWidth / 2)),
         (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
-    //--------------------------------------
 
 	for !rl.WindowShouldClose() {
-        // Update
-        //------------------------------------
-        switch appState.Screen {
-        case TitleScreen: 
-            if (rl.IsFileDropped()) {
-                droppedFile = rl.LoadDroppedFiles()
+        appState.Update()
 
-                if (len(droppedFile) > 0) {
-                    appState.DataSet = cmd.ParseWorkoutFile(droppedFile[0])
-                    rl.UnloadDroppedFiles()
-
-                    appState.Screen = WorkoutScreen
-                }
-            }
-            break;
-
-        case WorkoutScreen:
-            // note: to move the needle manually
-            if (rl.IsKeyDown(rl.KeyRight)) {
-                needlePosX = needlePosX + needleIncrementX
-                needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
-                appState.GetBlockBasedOnNeedlePos()
-            }
-            break;
-
-        default:
-            break;
-        }
-        //------------------------------------
-
-        // Draw
-        //------------------------------------
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-        switch appState.Screen {
-        case TitleScreen:
-            rl.DrawText("Drop a .FIT workout file here!",
-                190,
-                200,
-                20,
-                rl.LightGray)
-            break;
-
-        case WorkoutScreen:
-            if (len(appState.DataSet.Intervals) > 0) {
-                gui.Button(rl.Rectangle{
-                    X: float32(rl.GetScreenWidth()) - (10 + 30),
-                    Y: 10,
-                    Width: 30,
-                    Height: 30,
-                }, gui.IconText(gui.ICON_GEAR_BIG, ""))
-
-                rl.DrawText(
-                    fmt.Sprintf("Target power: %d - %d", appState.CurrentInterval.TargetLow, 
-                        appState.CurrentInterval.TargetHigh),
-                    10,
-                    10,
-                    20,
-                    rl.Black)
-
-                rl.DrawText(
-                    fmt.Sprintf("Interval: %d", appState.CurrentInterval.DurationSeconds),
-                    10,
-                    30,
-                    20,
-                    rl.Black)
-
-                rl.DrawText(
-                    fmt.Sprintf("Elapsed time: %d", appState.WorkoutElapsedTime),
-                    10,
-                    50,
-                    20,
-                    rl.Black)
-
-                appState.drawWorkoutCanvas()
-            } else {
-                log.Print("Could not read any data from fit file")
-                appState.Screen = TitleScreen
-            }
-            break;
-
-        default:
-            break;
-        }
+        appState.Draw()
 
 		rl.EndDrawing()
 	}
 }
 
+
+func (state *AppState) Update() {
+    droppedFile := make([]string, 0)
+
+    if (state.Screen == TitleScreen) {
+        if (rl.IsFileDropped()) {
+            droppedFile = rl.LoadDroppedFiles()
+
+            if (len(droppedFile) > 0) {
+                state.DataSet = cmd.ParseWorkoutFile(droppedFile[0])
+                rl.UnloadDroppedFiles()
+
+                state.Screen = WorkoutScreen
+            }
+        }
+        return
+    }
+
+    if (state.Screen == WorkoutScreen) {
+        if (rl.IsKeyDown(rl.KeyRight)) {
+            needlePosX = needlePosX + needleIncrementX
+            needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
+            state.GetBlockBasedOnNeedlePos()
+        }
+        return
+    }
+}
+
+func (state *AppState) Draw() {
+    if (state.Screen == TitleScreen) {
+        rl.DrawText("Drop a .FIT workout file here!",
+            190,
+            200,
+            20,
+            rl.LightGray)
+
+        return
+    }
+
+    if (state.Screen == WorkoutScreen) {
+        if (len(state.DataSet.Intervals) > 0) {
+            gui.Button(rl.Rectangle{
+                X: float32(rl.GetScreenWidth()) - (10 + 30),
+                Y: 10,
+                Width: 30,
+                Height: 30,
+            }, gui.IconText(gui.ICON_GEAR_BIG, ""))
+
+            rl.DrawText(
+                fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
+                    state.CurrentInterval.TargetHigh),
+                10,
+                10,
+                20,
+                rl.Black)
+
+            rl.DrawText(
+                fmt.Sprintf("Interval: %d", state.CurrentInterval.DurationSeconds),
+                10,
+                30,
+                20,
+                rl.Black)
+
+            rl.DrawText(
+                fmt.Sprintf("Elapsed time: %d", state.WorkoutElapsedTime),
+                10,
+                50,
+                20,
+                rl.Black)
+
+            state.drawWorkoutGraph()
+        } else {
+            log.Print("Could not read any data from fit file")
+            state.Screen = TitleScreen
+        }
+    }
+}
+
+
+
 // NOTE: maybe shoud use DrawingTexture
 // to group the whole thing
-func (state *AppState) drawWorkoutCanvas() {
+func (state *AppState) drawWorkoutGraph() {
     rl.DrawText(fmt.Sprint(state.DataSet.TotalDurationSeconds),
         190,
         200,
