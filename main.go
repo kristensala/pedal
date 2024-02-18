@@ -6,19 +6,27 @@ import (
 	"log"
 	"pedal/cmd"
 
-	rl "github.com/gen2brain/raylib-go/raylib"
 	gui "github.com/gen2brain/raylib-go/raygui"
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
-
-type AppState struct {
-    dataSet cmd.DataSet
-    screen ApplicationScreen
-}
 
 // local application settings
 // if needed
-type Settings struct {
+type AppState struct {
+    DataSet cmd.DataSet
+    Screen ApplicationScreen
+    WorkoutElapsedTime uint32
+    CurrentInterval cmd.Interval
+    CurrentIntervalNumber int
+    NextIntervalStartsAt int
+}
 
+// Needle state on canvas
+// TODO:
+type NeedleState struct {
+    PosX float64
+    PosPercentage float64
+    IncrementX float64
 }
 
 // Get the current workout state
@@ -27,10 +35,6 @@ var (
     needlePosX float64 = 0
     needlePosPercent float64 = 0
     needleIncrementX float64 = 0
-    currentWorkoutBlockNr int = 0
-    currentWorkoutBlock cmd.Block
-    workoutBlockChangeAtSecond = 0
-    workoutElapsedTime uint32 = 0
 )
 
 type ApplicationScreen int
@@ -38,6 +42,14 @@ const (
     TitleScreen ApplicationScreen = iota
     WorkoutScreen
 )
+
+func InitApp() (state AppState) {
+    state.Screen = TitleScreen
+    state.WorkoutElapsedTime = 0
+    state.CurrentIntervalNumber = 0
+    state.NextIntervalStartsAt = 0
+    return state
+}
 
 func main() {
     // Init
@@ -48,9 +60,7 @@ func main() {
     )
 
     droppedFile := make([]string, 0)
-    appState := AppState{
-        screen: TitleScreen,
-    }
+    appState := InitApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
 	defer rl.CloseWindow()
@@ -66,15 +76,16 @@ func main() {
 	for !rl.WindowShouldClose() {
         // Update
         //------------------------------------
-        switch appState.screen {
+        switch appState.Screen {
         case TitleScreen: 
             if (rl.IsFileDropped()) {
                 droppedFile = rl.LoadDroppedFiles()
 
                 if (len(droppedFile) > 0) {
-                    appState.dataSet = cmd.ParseWorkoutFile(droppedFile[0])
-                    appState.screen = WorkoutScreen
+                    appState.DataSet = cmd.ParseWorkoutFile(droppedFile[0])
                     rl.UnloadDroppedFiles()
+
+                    appState.Screen = WorkoutScreen
                 }
             }
             break;
@@ -84,7 +95,7 @@ func main() {
             if (rl.IsKeyDown(rl.KeyRight)) {
                 needlePosX = needlePosX + needleIncrementX
                 needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
-                getBlockBasedOnNeedlePos(appState.dataSet)
+                appState.GetBlockBasedOnNeedlePos()
             }
             break;
 
@@ -98,7 +109,7 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-        switch appState.screen {
+        switch appState.Screen {
         case TitleScreen:
             rl.DrawText("Drop a .FIT workout file here!",
                 190,
@@ -108,7 +119,7 @@ func main() {
             break;
 
         case WorkoutScreen:
-            if (len(appState.dataSet.Blocks) > 0) {
+            if (len(appState.DataSet.Intervals) > 0) {
                 gui.Button(rl.Rectangle{
                     X: float32(rl.GetScreenWidth()) - (10 + 30),
                     Y: 10,
@@ -117,21 +128,22 @@ func main() {
                 }, gui.IconText(gui.ICON_GEAR_BIG, ""))
 
                 rl.DrawText(
-                    fmt.Sprintf("Target power: %d - %d", currentWorkoutBlock.TargetLow, currentWorkoutBlock.TargetHigh),
+                    fmt.Sprintf("Target power: %d - %d", appState.CurrentInterval.TargetLow, 
+                        appState.CurrentInterval.TargetHigh),
                     10,
                     10,
                     20,
                     rl.Black)
 
                 rl.DrawText(
-                    fmt.Sprintf("Interval: %d", currentWorkoutBlock.DurationSeconds),
+                    fmt.Sprintf("Interval: %d", appState.CurrentInterval.DurationSeconds),
                     10,
                     30,
                     20,
                     rl.Black)
 
                 rl.DrawText(
-                    fmt.Sprintf("Elapsed time: %d", workoutElapsedTime),
+                    fmt.Sprintf("Elapsed time: %d", appState.WorkoutElapsedTime),
                     10,
                     50,
                     20,
@@ -140,7 +152,7 @@ func main() {
                 appState.drawWorkoutCanvas()
             } else {
                 log.Print("Could not read any data from fit file")
-                appState.screen = TitleScreen
+                appState.Screen = TitleScreen
             }
             break;
 
@@ -154,8 +166,8 @@ func main() {
 
 // NOTE: maybe shoud use DrawingTexture
 // to group the whole thing
-func (state AppState) drawWorkoutCanvas() {
-    rl.DrawText(fmt.Sprint(state.dataSet.TotalDurationSeconds),
+func (state *AppState) drawWorkoutCanvas() {
+    rl.DrawText(fmt.Sprint(state.DataSet.TotalDurationSeconds),
         190,
         200,
         20,
@@ -163,7 +175,7 @@ func (state AppState) drawWorkoutCanvas() {
 
     // canvas is always 50% of the screen height
     canvasHeight := float32(rl.GetScreenHeight()) * float32(0.5)
-    canvas := renderCanvas(state.dataSet, canvasHeight)
+    canvas := renderCanvas(state.DataSet, canvasHeight)
 
     // makes sure that on window resize 
     // the needle is in the correct poisition
@@ -203,7 +215,7 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
     needleIncrementX = timeGap
     
     blockX := 0.0
-    for _, b := range data.Blocks {
+    for _, b := range data.Intervals {
         blockHighEndHeight := float64(b.TargetHigh) * powerGap
         blockLowEndHeight := float64(b.TargetLow) * powerGap
         blockWidth := float64(b.DurationSeconds) * timeGap
@@ -256,40 +268,33 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
 
 // Values needed
 // Dataset; Needle pos and needle increment; total duration in seconds
-func getBlockBasedOnNeedlePos(dataSet cmd.DataSet) {
+func (state *AppState) GetBlockBasedOnNeedlePos() {
     // gives me the actual second we are on
-    workoutElapsedTime = uint32(needlePosX / needleIncrementX)
+    state.WorkoutElapsedTime = uint32(needlePosX / needleIncrementX)
 
-    if (len(dataSet.Blocks) == 0) {
+    if (len(state.DataSet.Intervals) == 0) {
         return
     }
 
     // fix: do not index into array every time
     // save the block into some sort of an application state
-    currentWorkoutBlock = dataSet.Blocks[currentWorkoutBlockNr]
-    fmt.Printf("%d; %d ;", int(workoutElapsedTime), currentWorkoutBlock.DurationSeconds)
-
-    if (currentWorkoutBlockNr == 0) {
-        workoutBlockChangeAtSecond = int(currentWorkoutBlock.DurationSeconds)
+    state.CurrentInterval = state.DataSet.Intervals[state.CurrentIntervalNumber]
+    if (state.CurrentIntervalNumber == 0) {
+        state.NextIntervalStartsAt = int(state.CurrentInterval.DurationSeconds)
     }
 
-    if (workoutElapsedTime > uint32(workoutBlockChangeAtSecond)) {
-        currentWorkoutBlockNr += 1
+    if (state.WorkoutElapsedTime > uint32(state.NextIntervalStartsAt)) {
+        state.CurrentIntervalNumber += 1
 
         // TODO: send some sort of a signal
         // save the workout
-        if (currentWorkoutBlockNr == len(dataSet.Blocks)) {
+        if (state.CurrentIntervalNumber == len(state.DataSet.Intervals)) {
             fmt.Println("workout ENDED")
             return;
         }
 
-        newBlock := dataSet.Blocks[currentWorkoutBlockNr]
-        
-        workoutBlockChangeAtSecond = int(workoutElapsedTime) + int(newBlock.DurationSeconds)
-        fmt.Printf("next block starts at: %d second\n", workoutBlockChangeAtSecond)
-
-    } else {
-        fmt.Println(currentWorkoutBlock.TargetLow)
+        nextInterval := state.DataSet.Intervals[state.CurrentIntervalNumber]
+        state.NextIntervalStartsAt = int(state.WorkoutElapsedTime) + int(nextInterval.DurationSeconds)
     }
 }
 

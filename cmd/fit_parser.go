@@ -15,10 +15,10 @@ import (
 type DataSet struct {
     TotalDurationSeconds int
     ThresholdPower uint32
-    Blocks []Block
+    Intervals []Interval
 }
 
-type Block struct {
+type Interval struct {
     Number uint16
     DurationSeconds uint32
     TargetLow uint32
@@ -54,7 +54,7 @@ func ParseWorkoutFile(fullFilePath string) DataSet {
 
     dataSet = DataSet{
         TotalDurationSeconds: totalDuration,
-        Blocks: result,
+        Intervals: result,
         ThresholdPower: 200,
     }
 
@@ -64,8 +64,8 @@ func ParseWorkoutFile(fullFilePath string) DataSet {
     return dataSet
 }
 
-func buildBlocks(messages []*fit.WorkoutStepMsg) []Block {
-    steps := []Block{}
+func buildBlocks(messages []*fit.WorkoutStepMsg) []Interval {
+    steps := []Interval{}
 
     for _, stepMsg := range messages {
         if stepMsg.DurationType.String() == "Time" {
@@ -73,7 +73,7 @@ func buildBlocks(messages []*fit.WorkoutStepMsg) []Block {
             powerHigh := stepMsg.CustomTargetValueHigh - 1000
             powerLow := stepMsg.CustomTargetValueLow - 1000
 
-            newStep := Block{
+            newStep := Interval{
                 Number: uint16(stepMsg.MessageIndex),
                 DurationSeconds: duration,
                 TargetLow: powerLow,
@@ -98,7 +98,7 @@ func buildBlocks(messages []*fit.WorkoutStepMsg) []Block {
     return steps
 }
 
-func getTotalDurationInSeconds(blocks []Block) int {
+func getTotalDurationInSeconds(blocks []Interval) int {
     totalDuration := 0
 
     for _, b := range blocks {
