@@ -1,3 +1,6 @@
+# Pedal
+![image](/assets/draft1.jpg)
+
 # TODO:
 - display numbers
     - target power range
