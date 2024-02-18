@@ -1,5 +1,5 @@
 # Pedal
-![image](/assets/draft1.jpg)
+![image](/assets/draft1.png)
 
 # TODO:
 - display numbers
