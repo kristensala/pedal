@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"image/color"
+	"log"
 	"pedal/cmd"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -10,7 +12,7 @@ import (
 
 type AppState struct {
     dataSet cmd.DataSet
-    screen CurrentScreen
+    screen ApplicationScreen
 }
 
 // Get the current workout state
@@ -23,15 +25,19 @@ var (
     workoutBlockChangeAtSecond = 0
 )
 
-type CurrentScreen int
+type ApplicationScreen int
 const (
-    TitleScreen CurrentScreen = iota
+    TitleScreen ApplicationScreen = iota
     WorkoutScreen
 )
 
 func main() {
-    const windowHeight = 450
-    const windowWidth = 800
+    // Init
+    //-------------------------------------
+    const (
+        windowHeight = 450
+        windowWidth = 800
+    )
 
     droppedFile := make([]string, 0)
     appState := AppState{
@@ -47,12 +53,13 @@ func main() {
     rl.SetWindowPosition(
         (rl.GetMonitorWidth(0) - (windowWidth / 2)),
         (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
+    //--------------------------------------
 
 	for !rl.WindowShouldClose() {
         // Update
         //------------------------------------
         switch appState.screen {
-        case TitleScreen: {
+        case TitleScreen: 
             if (rl.IsFileDropped()) {
                 droppedFile = rl.LoadDroppedFiles()
 
@@ -63,8 +70,8 @@ func main() {
                 }
             }
             break;
-        }
-        case WorkoutScreen: {
+
+        case WorkoutScreen:
             // note: to move the needle manually
             if (rl.IsKeyDown(rl.KeyRight)) {
                 needlePosX = needlePosX + needleIncrementX
@@ -72,8 +79,9 @@ func main() {
                 getBlockBasedOnNeedlePos(appState.dataSet)
             }
             break;
-        }
-        default: break;
+
+        default:
+            break;
         }
         //------------------------------------
 
@@ -83,27 +91,33 @@ func main() {
 		rl.ClearBackground(rl.RayWhite)
 
         switch appState.screen {
-        case TitleScreen: {
+        case TitleScreen:
             rl.DrawText("Drop a .FIT workout file here!",
                 190,
                 200,
                 20,
                 rl.LightGray)
             break;
-        }
-        case WorkoutScreen: {
+
+        case WorkoutScreen:
             if (len(appState.dataSet.Blocks) > 0) {
                 appState.drawWorkoutCanvas()
+            } else {
+                log.Print("Could not read any data from fit file")
+                appState.screen = TitleScreen
             }
             break;
-        }
-        default: break;
+
+        default:
+            break;
         }
 
 		rl.EndDrawing()
 	}
 }
 
+// NOTE: maybe shoud use DrawingTexture
+// to group the whole thing
 func (state AppState) drawWorkoutCanvas() {
     rl.DrawText(fmt.Sprint(state.dataSet.TotalDurationSeconds),
         190,
@@ -117,7 +131,7 @@ func (state AppState) drawWorkoutCanvas() {
 
     // makes sure that on window resize 
     // the needle is in the correct poisition
-    // Assumes that canvas width is window width
+    // Assumes that canvas width is same as window width
     needlePosX = (float64(needlePosPercent) * float64(canvas.Width)) / 100
 
     // Draw the Needle
@@ -144,7 +158,7 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
     }
 
     // draw canvas element (the parent element)
-    rl.DrawRectangleRec(canvas, rl.Blue)
+    rl.DrawRectangleRec(canvas, rl.Black)
 
     // calculate 1s and 1w pixels
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
@@ -168,7 +182,7 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
             Height: float32(blockHighEndHeight),
             Width: float32(blockWidth),
         }
-        rl.DrawRectangleRec(block, rl.Yellow)
+        rl.DrawRectangleRec(block, color.RGBA{38, 210, 66, 255})
 
         lowEndBlock := rl.Rectangle{
             X: float32(blockX),
@@ -176,10 +190,30 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
             Height: float32(blockLowEndHeight),
             Width: float32(blockWidth),
         }
-        rl.DrawRectangleRec(lowEndBlock, rl.LightGray) //fix: better colors
+        rl.DrawRectangleRec(lowEndBlock, color.RGBA{30, 167, 53, 255})
 
         blockX = blockX + blockWidth
     }
+
+    // Draw canvas power guide lines
+    rl.DrawText("600",
+        canvas.ToInt32().X,
+        canvas.ToInt32().Y,
+        18,
+        rl.White)
+
+    rl.DrawText("300",
+        canvas.ToInt32().X,
+        canvas.ToInt32().Y + (canvas.ToInt32().Height / 2),
+        18,
+        rl.White)
+
+    rl.DrawLine(
+        0,
+        canvas.ToInt32().Y + (canvas.ToInt32().Height / 2),
+        canvas.ToInt32().Width,
+        canvas.ToInt32().Y + (canvas.ToInt32().Height / 2),
+        rl.White)
 
     return canvas
 }

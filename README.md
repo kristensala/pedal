@@ -5,3 +5,4 @@
     - current cadence
     - HR
     - Interval time left
+- prevent premature window close (confirmation modal)
