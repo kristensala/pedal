@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/client9/misspell v0.3.4 // indirect
 	github.com/ebitengine/purego v0.6.0 // indirect
+	github.com/gen2brain/raylib-go/raygui v0.0.0-20240125111008-83d871a38f28 // indirect
 	github.com/gen2brain/raylib-go/raylib v0.0.0-20240125111008-83d871a38f28 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/gordonklaus/ineffassign v0.0.0-20210914165742-4cc7213b9bc8 // indirect

@@ -5,6 +5,7 @@ import (
 	"pedal/cmd"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+	//gui "github.com/gen2brain/raylib-go/raygui"
 )
 
 type AppState struct {
@@ -13,24 +14,32 @@ type AppState struct {
 
 // Get the current workout state
 // through the needle pos
-var needlePosX float64 = 0
-var needlePosPercent float64 = 0
-var needleIncrementX float64 = 0
-var currentWorkoutBlockNr int = 0
-var workoutBlockChangeAtSecond = 0
+var (
+    needlePosX float64 = 0
+    needlePosPercent float64 = 0
+    needleIncrementX float64 = 0
+    currentWorkoutBlockNr int = 0
+    workoutBlockChangeAtSecond = 0
+)
 
 func main() {
-	rl.InitWindow(800, 450, "Pedal")
-	defer rl.CloseWindow()
+    const windowHeight = 450
+    const windowWidth = 800
 
     droppedFile := make([]string, 0)
     appState := AppState{}
 
+	rl.InitWindow(windowWidth, windowHeight, "Pedal")
+	defer rl.CloseWindow()
+
 	rl.SetTargetFPS(60)
 
+    // works for my enormous screen
+    rl.SetWindowPosition(
+        (rl.GetMonitorWidth(0) - (windowWidth / 2)),
+        (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
 
 	for !rl.WindowShouldClose() {
-
         if (rl.IsFileDropped()) {
             droppedFile = rl.LoadDroppedFiles()
 
@@ -40,7 +49,7 @@ func main() {
             }
         }
 
-        // note: to test manually
+        // note: to move the needle manually
         if (rl.IsKeyDown(rl.KeyRight)) {
             needlePosX = needlePosX + needleIncrementX
             needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
@@ -48,11 +57,10 @@ func main() {
         }
 
 		rl.BeginDrawing()
-
 		rl.ClearBackground(rl.RayWhite)
 
         if (len(appState.dataSet.Blocks) > 0) {
-            appState.renderWorkoutView()
+            appState.drawWorkoutCanvas()
         } else {
             rl.DrawText("Drop a .FIT workout file here!",
                 190,
@@ -65,7 +73,7 @@ func main() {
 	}
 }
 
-func (state AppState) renderWorkoutView() {
+func (state AppState) drawWorkoutCanvas() {
     rl.DrawText(fmt.Sprint(state.dataSet.TotalDurationSeconds),
         190,
         200,
