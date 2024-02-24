@@ -9,9 +9,6 @@ import (
 	"github.com/tormoder/fit"
 )
 
-// TODO:
-// get the total duration of the workout
-
 type DataSet struct {
     TotalDurationSeconds int
     ThresholdPower uint32

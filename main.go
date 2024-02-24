@@ -10,8 +10,6 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
-// local application settings
-// if needed
 type AppState struct {
     DataSet cmd.DataSet
     Screen ApplicationScreen
@@ -21,8 +19,8 @@ type AppState struct {
     NextIntervalStartsAt int
 }
 
-// Needle state on canvas
 // TODO:
+// Needle state on canvas
 type NeedleState struct {
     PosX float64
     PosPercentage float64
@@ -37,10 +35,20 @@ var (
     needleIncrementX float64 = 0
 )
 
+const (
+    windowHeight = 450
+    windowWidth = 800
+
+    settingsBtnSize float32 = 30
+    canvasMaxPowerDisplay int32 = 600
+)
+
 type ApplicationScreen int
 const (
     TitleScreen ApplicationScreen = iota
     WorkoutScreen
+    SettingsScreen
+    DevicesScreen
 )
 
 func InitApp() (state AppState) {
@@ -52,11 +60,6 @@ func InitApp() (state AppState) {
 }
 
 func main() {
-    const (
-        windowHeight = 450
-        windowWidth = 800
-    )
-
     appState := InitApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
@@ -80,8 +83,8 @@ func main() {
 	}
 }
 
-
 func (state *AppState) Update() {
+    // note: Is this in the correct place?
     droppedFile := make([]string, 0)
 
     if (state.Screen == TitleScreen) {
@@ -99,6 +102,7 @@ func (state *AppState) Update() {
     }
 
     if (state.Screen == WorkoutScreen) {
+        // Move the needle manually for testing
         if (rl.IsKeyDown(rl.KeyRight)) {
             needlePosX = needlePosX + needleIncrementX
             needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
@@ -121,13 +125,15 @@ func (state *AppState) Draw() {
 
     if (state.Screen == WorkoutScreen) {
         if (len(state.DataSet.Intervals) > 0) {
+            // Settings button
             gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - (10 + 30),
+                X: float32(rl.GetScreenWidth()) - (10 + settingsBtnSize),
                 Y: 10,
-                Width: 30,
-                Height: 30,
+                Width: settingsBtnSize,
+                Height: settingsBtnSize,
             }, gui.IconText(gui.ICON_GEAR_BIG, ""))
 
+            // Draw some text
             rl.DrawText(
                 fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
                     state.CurrentInterval.TargetHigh),
@@ -147,6 +153,13 @@ func (state *AppState) Draw() {
                 fmt.Sprintf("Elapsed time: %d", state.WorkoutElapsedTime),
                 10,
                 50,
+                20,
+                rl.Black)
+
+            rl.DrawText(
+                fmt.Sprintf("Current HR: %d", 0),
+                10,
+                70,
                 20,
                 rl.Black)
 
@@ -204,9 +217,9 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
     // draw canvas element (the parent element)
     rl.DrawRectangleRec(canvas, rl.Black)
 
-    // calculate 1s and 1w pixels
+    // calculate 1sec and 1w pixels
     timeGap := float64(canvas.Width) / float64(data.TotalDurationSeconds)
-    powerGap := float64(canvas.Height) / 600 // 600W is max power to display
+    powerGap := float64(canvas.Height) / float64(canvasMaxPowerDisplay)
 
     needleIncrementX = timeGap
     
@@ -284,6 +297,8 @@ func (state *AppState) GetBlockBasedOnNeedlePos() {
 
         // TODO: send some sort of a signal
         // save the workout
+        // change the screen
+        // show the completed workout
         if (state.CurrentIntervalNumber == len(state.DataSet.Intervals)) {
             fmt.Println("workout ENDED")
             return;
