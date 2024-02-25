@@ -17,6 +17,7 @@ type AppState struct {
     CurrentInterval cmd.Interval
     CurrentIntervalNumber int
     NextIntervalStartsAt int
+    BluetoothCtl cmd.BluetoothControl
 }
 
 // TODO:
@@ -44,8 +45,13 @@ var (
 
     listActive int32 = 2
     selectedDeviceIdx int32 = int32(-1)
-)
 
+    backBtnClicked bool = false
+    scanBtnClicked bool = false
+    devicesBtnClicked bool = false
+
+    scannedDevices []string = []string{}
+)
 
 type ApplicationScreen int
 const (
@@ -53,6 +59,7 @@ const (
     WorkoutScreen
     SettingsScreen
     DevicesScreen
+    WorkoutCompletedScreen
 )
 
 func InitApp() (state AppState) {
@@ -60,6 +67,7 @@ func InitApp() (state AppState) {
     state.WorkoutElapsedTime = 0
     state.CurrentIntervalNumber = 0
     state.NextIntervalStartsAt = 0
+    state.BluetoothCtl = cmd.InitBt()
     return state
 }
 
@@ -105,14 +113,65 @@ func (state *AppState) Update() {
         return
     }
 
-    if (state.Screen == WorkoutScreen) {
+    if state.Screen == WorkoutScreen {
         // Move the needle manually for testing
-        if (rl.IsKeyDown(rl.KeyRight)) {
+        if rl.IsKeyDown(rl.KeyRight) {
             needlePosX = needlePosX + needleIncrementX
             needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
             state.GetBlockBasedOnNeedlePos()
+            return
         }
+
+        if devicesBtnClicked {
+            state.Screen = DevicesScreen
+            return
+        }
+
         return
+    }
+
+    if (state.Screen == DevicesScreen) {
+        // move back to the workout screen
+        if (backBtnClicked) {
+            state.Screen = WorkoutScreen
+            return;
+        }
+
+        if (scanBtnClicked) {
+            scannedDevices = []string{}
+
+            ch := make(chan string)
+            go state.BluetoothCtl.Scan(ch)
+            go func() {
+                for {
+                    val, ok := <-ch
+                    if !ok {
+                        scanBtnClicked = false
+                        break
+                    }
+
+                    if len(val) == 0 {
+                        continue
+                    }
+
+                    if len(scannedDevices) == 0 {
+                        scannedDevices = append(scannedDevices, val)
+                    } else {
+                        hasDuplicate := false
+                        for _, device := range scannedDevices {
+                            if device == val {
+                                hasDuplicate = true
+                                break;
+                            }
+                        }
+
+                        if !hasDuplicate {
+                            scannedDevices = append(scannedDevices, val)
+                        }
+                    }
+                }
+            }()
+        }
     }
 }
 
@@ -127,8 +186,8 @@ func (state *AppState) Draw() {
         return
     }
 
-    if (state.Screen == WorkoutScreen) {
-        if (len(state.DataSet.Intervals) > 0) {
+    if state.Screen == WorkoutScreen {
+        if len(state.DataSet.Intervals) > 0 {
             // Settings button
             gui.Button(rl.Rectangle{
                 X: float32(rl.GetScreenWidth()) - (10 + defaultBtnSize),
@@ -138,7 +197,7 @@ func (state *AppState) Draw() {
             }, gui.IconText(gui.ICON_GEAR_BIG, ""))
 
             // Devices button
-            deviceBtnClicked := gui.Button(rl.Rectangle{
+            devicesBtnClicked = gui.Button(rl.Rectangle{
                 X: float32(rl.GetScreenWidth()) - (50 + defaultBtnSize),
                 Y: 10,
                 Width: defaultBtnSize,
@@ -146,11 +205,6 @@ func (state *AppState) Draw() {
             }, gui.IconText(gui.ICON_TOOLS, ""))
 
             // open devices screen
-            if (deviceBtnClicked) {
-                log.Println("device Btn clicked")
-                state.Screen = DevicesScreen
-                return;
-            }
 
             // Draw some text
             rl.DrawText(
@@ -190,20 +244,21 @@ func (state *AppState) Draw() {
     }
 
     if (state.Screen == DevicesScreen) {
-        backBtnClicked := gui.Button(rl.Rectangle{
+        backBtnClicked = gui.Button(rl.Rectangle{
             X: 10,
             Y: 10,
             Width: defaultBtnSize,
             Height: defaultBtnSize,
         }, gui.IconText(gui.ICON_ARROW_LEFT, ""))
 
-        // move back to the workout screen
-        if (backBtnClicked) {
-            state.Screen = WorkoutScreen
-            return;
-        }
+        scanBtnClicked = gui.Button(rl.Rectangle{
+            X: 50,
+            Y: 10,
+            Width: 100,
+            Height: defaultBtnSize,
+        }, "Scan devices")
 
-        items := []string{"device1", "device2"}
+
         listViewBounds := rl.Rectangle{
             X: (float32(rl.GetScreenWidth()) / 2) - 200,
             Y: 10,
@@ -212,7 +267,7 @@ func (state *AppState) Draw() {
         }
 
         // TODO: how to select device in the list box
-        listActive = gui.ListViewEx(listViewBounds, items, &selectedDeviceIdx, nil, listActive)
+        listActive = gui.ListViewEx(listViewBounds, scannedDevices, &selectedDeviceIdx, nil, listActive)
     }
 }
 
@@ -318,10 +373,9 @@ func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
     return canvas
 }
 
-// Values needed
-// Dataset; Needle pos and needle increment; total duration in seconds
 func (state *AppState) GetBlockBasedOnNeedlePos() {
     // gives me the actual second we are on
+    // based on the needle position on canvas
     state.WorkoutElapsedTime = uint32(needlePosX / needleIncrementX)
 
     if (len(state.DataSet.Intervals) == 0) {
@@ -335,7 +389,7 @@ func (state *AppState) GetBlockBasedOnNeedlePos() {
         state.NextIntervalStartsAt = int(state.CurrentInterval.DurationSeconds)
     }
 
-    if (state.WorkoutElapsedTime > uint32(state.NextIntervalStartsAt)) {
+    if (state.WorkoutElapsedTime >= uint32(state.NextIntervalStartsAt)) {
         state.CurrentIntervalNumber += 1
 
         // TODO: send some sort of a signal
