@@ -27,21 +27,25 @@ type NeedleState struct {
     IncrementX float64
 }
 
+const (
+    windowHeight = 450
+    windowWidth = 800
+
+    defaultBtnSize float32 = 30
+    canvasMaxPowerDisplay int32 = 600
+)
+
 // Get the current workout state
 // through the needle pos
 var (
     needlePosX float64 = 0
     needlePosPercent float64 = 0
     needleIncrementX float64 = 0
+
+    listActive int32 = 2
+    selectedDeviceIdx int32 = int32(-1)
 )
 
-const (
-    windowHeight = 450
-    windowWidth = 800
-
-    settingsBtnSize float32 = 30
-    canvasMaxPowerDisplay int32 = 600
-)
 
 type ApplicationScreen int
 const (
@@ -127,11 +131,26 @@ func (state *AppState) Draw() {
         if (len(state.DataSet.Intervals) > 0) {
             // Settings button
             gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - (10 + settingsBtnSize),
+                X: float32(rl.GetScreenWidth()) - (10 + defaultBtnSize),
                 Y: 10,
-                Width: settingsBtnSize,
-                Height: settingsBtnSize,
+                Width: defaultBtnSize,
+                Height: defaultBtnSize,
             }, gui.IconText(gui.ICON_GEAR_BIG, ""))
+
+            // Devices button
+            deviceBtnClicked := gui.Button(rl.Rectangle{
+                X: float32(rl.GetScreenWidth()) - (50 + defaultBtnSize),
+                Y: 10,
+                Width: defaultBtnSize,
+                Height: defaultBtnSize,
+            }, gui.IconText(gui.ICON_TOOLS, ""))
+
+            // open devices screen
+            if (deviceBtnClicked) {
+                log.Println("device Btn clicked")
+                state.Screen = DevicesScreen
+                return;
+            }
 
             // Draw some text
             rl.DrawText(
@@ -169,9 +188,33 @@ func (state *AppState) Draw() {
             state.Screen = TitleScreen
         }
     }
+
+    if (state.Screen == DevicesScreen) {
+        backBtnClicked := gui.Button(rl.Rectangle{
+            X: 10,
+            Y: 10,
+            Width: defaultBtnSize,
+            Height: defaultBtnSize,
+        }, gui.IconText(gui.ICON_ARROW_LEFT, ""))
+
+        // move back to the workout screen
+        if (backBtnClicked) {
+            state.Screen = WorkoutScreen
+            return;
+        }
+
+        items := []string{"device1", "device2"}
+        listViewBounds := rl.Rectangle{
+            X: (float32(rl.GetScreenWidth()) / 2) - 200,
+            Y: 10,
+            Height: float32(rl.GetScreenHeight()) - 20,
+            Width: 400,
+        }
+
+        // TODO: how to select device in the list box
+        listActive = gui.ListViewEx(listViewBounds, items, &selectedDeviceIdx, nil, listActive)
+    }
 }
-
-
 
 // NOTE: maybe shoud use DrawingTexture
 // to group the whole thing
