@@ -31,6 +31,7 @@ type NeedleState struct {
 const (
     windowHeight = 450
     windowWidth = 800
+    fontSize = 20
 
     defaultBtnSize float32 = 30
     canvasMaxPowerDisplay int32 = 600
@@ -51,6 +52,8 @@ var (
     devicesBtnClicked bool = false
 
     scannedDevices []string = []string{}
+
+    listViewBounds rl.Rectangle
 )
 
 type ApplicationScreen int
@@ -96,10 +99,10 @@ func main() {
 }
 
 func (state *AppState) Update() {
-    // note: Is this in the correct place?
-    droppedFile := make([]string, 0)
-
+    //================ Title screen =================
     if (state.Screen == TitleScreen) {
+        droppedFile := make([]string, 0)
+
         if (rl.IsFileDropped()) {
             droppedFile = rl.LoadDroppedFiles()
 
@@ -112,7 +115,9 @@ func (state *AppState) Update() {
         }
         return
     }
+    //=================================================
 
+    //================ Workout screen =================
     if state.Screen == WorkoutScreen {
         // Move the needle manually for testing
         if rl.IsKeyDown(rl.KeyRight) {
@@ -129,54 +134,66 @@ func (state *AppState) Update() {
 
         return
     }
+    //================================================
 
-    if (state.Screen == DevicesScreen) {
+
+    //================= Devices screen =================
+    if state.Screen == DevicesScreen {
         // move back to the workout screen
         if (backBtnClicked) {
             state.Screen = WorkoutScreen
             return;
         }
+        //---------------------------------------------------
 
-        if (scanBtnClicked) {
+        // Scan devices btn click ---------------------------
+        if scanBtnClicked {
             scannedDevices = []string{}
 
-            ch := make(chan string)
+            ch := make(chan cmd.BluetoothDevice)
             go state.BluetoothCtl.Scan(ch)
             go func() {
                 for {
-                    val, ok := <-ch
+                    bltDevice, ok := <-ch
                     if !ok {
-                        scanBtnClicked = false
                         break
                     }
 
-                    if len(val) == 0 {
-                        continue
-                    }
-
                     if len(scannedDevices) == 0 {
-                        scannedDevices = append(scannedDevices, val)
+                        scannedDevices = append(scannedDevices, bltDevice.ToString())
                     } else {
                         hasDuplicate := false
                         for _, device := range scannedDevices {
-                            if device == val {
+                            if device == bltDevice.ToString() {
                                 hasDuplicate = true
                                 break;
                             }
                         }
 
                         if !hasDuplicate {
-                            scannedDevices = append(scannedDevices, val)
+                            scannedDevices = append(scannedDevices, bltDevice.ToString())
                         }
                     }
                 }
             }()
         }
+        //-------------------------------------------------
+
+        // Connect to device click ------------------------
+        mousePos := rl.GetMousePosition()
+        if rl.CheckCollisionPointRec(mousePos, listViewBounds) {
+            if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
+                log.Println("clicked inside the list")
+                // TODO: select the device on click here
+            }
+        }
+        //-------------------------------------------------
     }
+    //====================================================
 }
 
 func (state *AppState) Draw() {
-    if (state.Screen == TitleScreen) {
+    if state.Screen == TitleScreen {
         rl.DrawText("Drop a .FIT workout file here!",
             190,
             200,
@@ -204,36 +221,26 @@ func (state *AppState) Draw() {
                 Height: defaultBtnSize,
             }, gui.IconText(gui.ICON_TOOLS, ""))
 
-            // open devices screen
-
             // Draw some text
             rl.DrawText(
                 fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
                     state.CurrentInterval.TargetHigh),
-                10,
-                10,
-                20,
+                10, 10, 20,
                 rl.Black)
 
             rl.DrawText(
                 fmt.Sprintf("Interval: %d", state.CurrentInterval.DurationSeconds),
-                10,
-                30,
-                20,
+                10, 30, 20,
                 rl.Black)
 
             rl.DrawText(
                 fmt.Sprintf("Elapsed time: %d", state.WorkoutElapsedTime),
-                10,
-                50,
-                20,
+                10, 50, 20,
                 rl.Black)
 
             rl.DrawText(
                 fmt.Sprintf("Current HR: %d", 0),
-                10,
-                70,
-                20,
+                10, 70, 20,
                 rl.Black)
 
             state.drawWorkoutGraph()
@@ -259,15 +266,19 @@ func (state *AppState) Draw() {
         }, "Scan devices")
 
 
-        listViewBounds := rl.Rectangle{
+        listViewBounds = rl.Rectangle{
             X: (float32(rl.GetScreenWidth()) / 2) - 200,
             Y: 10,
             Height: float32(rl.GetScreenHeight()) - 20,
             Width: 400,
         }
 
-        // TODO: how to select device in the list box
-        listActive = gui.ListViewEx(listViewBounds, scannedDevices, &selectedDeviceIdx, nil, listActive)
+        listActive = gui.ListViewEx(
+            listViewBounds,
+            scannedDevices,
+            &selectedDeviceIdx,
+            nil,
+            listActive)
     }
 }
 
@@ -275,9 +286,7 @@ func (state *AppState) Draw() {
 // to group the whole thing
 func (state *AppState) drawWorkoutGraph() {
     rl.DrawText(fmt.Sprint(state.DataSet.TotalDurationSeconds),
-        190,
-        200,
-        20,
+        190, 200, 20,
         rl.Green)
 
     // canvas is always 50% of the screen height

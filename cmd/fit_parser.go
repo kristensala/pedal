@@ -45,6 +45,8 @@ func ParseWorkoutFile(fullFilePath string) DataSet {
         return dataSet
     }
 
+    /*resultJson, _ := json.MarshalIndent(workoutFile.WorkoutSteps, ""," ")
+    fmt.Println(string(resultJson))*/
 
     result := buildBlocks(workoutFile.WorkoutSteps)
     totalDuration := getTotalDurationInSeconds(result)
@@ -84,7 +86,12 @@ func buildBlocks(messages []*fit.WorkoutStepMsg) []Interval {
             repeatFrom := stepMsg.DurationValue
             repeatTimes := stepMsg.TargetValue - 1 // minus one because one entry is already in array
 
-            sliceToRepeat := steps[repeatFrom:]
+            sliceToRepeat := []Interval{}
+            for _, step := range steps {
+                if step.Number >= uint16(repeatFrom) {
+                    sliceToRepeat = append(sliceToRepeat, step)
+                }
+            }
 
             for i := 0; i < int(repeatTimes); i++ {
                 steps = append(steps, sliceToRepeat...)
