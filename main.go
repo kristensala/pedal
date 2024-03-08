@@ -4,20 +4,21 @@ import (
 	"fmt"
 	"image/color"
 	"log"
-	"pedal/cmd"
+	bt "pedal/internal/bluetoothctl"
+	"pedal/internal/fit"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type AppState struct {
-    DataSet cmd.DataSet
+    DataSet fit.DataSet
     Screen ApplicationScreen
     WorkoutElapsedTime uint32
-    CurrentInterval cmd.Interval
+    CurrentInterval fit.Interval
     CurrentIntervalNumber int
     NextIntervalStartsAt int
-    BluetoothCtl cmd.BluetoothControl
+    BluetoothCtl bt.BluetoothControl
 }
 
 // TODO:
@@ -31,7 +32,7 @@ type NeedleState struct {
 const (
     windowHeight = 450
     windowWidth = 800
-    fontSize = 20
+    fontSize = 30
 
     defaultBtnSize float32 = 30
     canvasMaxPowerDisplay int32 = 600
@@ -50,6 +51,7 @@ var (
     backBtnClicked bool = false
     scanBtnClicked bool = false
     devicesBtnClicked bool = false
+    endWorkoutClicked bool = false
 
     scannedDevices []string = []string{}
 
@@ -70,7 +72,7 @@ func InitApp() (state AppState) {
     state.WorkoutElapsedTime = 0
     state.CurrentIntervalNumber = 0
     state.NextIntervalStartsAt = 0
-    state.BluetoothCtl = cmd.InitBt()
+    state.BluetoothCtl = bt.Init()
     return state
 }
 
@@ -107,7 +109,7 @@ func (state *AppState) Update() {
             droppedFile = rl.LoadDroppedFiles()
 
             if (len(droppedFile) > 0) {
-                state.DataSet = cmd.ParseWorkoutFile(droppedFile[0])
+                state.DataSet = fit.ParseWorkoutFile(droppedFile[0])
                 rl.UnloadDroppedFiles()
 
                 state.Screen = WorkoutScreen
@@ -150,8 +152,8 @@ func (state *AppState) Update() {
         if scanBtnClicked {
             scannedDevices = []string{}
 
-            ch := make(chan cmd.BluetoothDevice)
-            go state.BluetoothCtl.Scan(ch)
+            ch := make(chan bt.BluetoothDevice)
+            go state.BluetoothCtl.Scan(ch, []string{})
             go func() {
                 for {
                     bltDevice, ok := <-ch
@@ -220,6 +222,14 @@ func (state *AppState) Draw() {
                 Width: defaultBtnSize,
                 Height: defaultBtnSize,
             }, gui.IconText(gui.ICON_TOOLS, ""))
+
+
+            endWorkoutClicked = gui.Button(rl.Rectangle{
+                X: float32(rl.GetScreenWidth()) - 195,
+                Y: 10,
+                Width: 100,
+                Height: defaultBtnSize,
+            }, "End workout")
 
             // Draw some text
             rl.DrawText(
@@ -311,7 +321,7 @@ func (state *AppState) drawWorkoutGraph() {
     rl.DrawLineV(startPos, endPos, rl.Red)
 }
 
-func renderCanvas(data cmd.DataSet, height float32) rl.Rectangle {
+func renderCanvas(data fit.DataSet, height float32) rl.Rectangle {
     canvasX, canvasY := 0, float32(rl.GetScreenHeight()) - height
 
     canvas := rl.Rectangle{
