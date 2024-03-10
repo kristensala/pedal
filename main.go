@@ -53,9 +53,12 @@ var (
     devicesBtnClicked bool = false
     endWorkoutClicked bool = false
 
-    scannedDevices []string = []string{}
+    scannedDevices []bt.BluetoothDevice = []bt.BluetoothDevice{}
 
     listViewBounds rl.Rectangle
+
+    currentHeartRate uint8
+    currentPower uint8
 )
 
 type ApplicationScreen int
@@ -117,7 +120,6 @@ func (state *AppState) update() {
         }
         return
     }
-    //=================================================
 
     //================ Workout screen =================
     if state.Screen == WorkoutScreen {
@@ -136,8 +138,6 @@ func (state *AppState) update() {
 
         return
     }
-    //================================================
-
 
     //================= Devices screen =================
     if state.Screen == DevicesScreen {
@@ -145,11 +145,10 @@ func (state *AppState) update() {
             state.Screen = WorkoutScreen
             return;
         }
-        //---------------------------------------------------
 
         // Scan devices btn click ---------------------------
         if scanBtnClicked {
-            scannedDevices = []string{}
+            scannedDevices = []bt.BluetoothDevice{}
 
             ch := make(chan bt.BluetoothDevice)
             go state.BluetoothCtl.Scan(ch, []string{})
@@ -161,36 +160,55 @@ func (state *AppState) update() {
                     }
 
                     if len(scannedDevices) == 0 {
-                        scannedDevices = append(scannedDevices, bltDevice.ToString())
+                        scannedDevices = append(scannedDevices, bltDevice)
                     } else {
                         exists := false
                         for _, device := range scannedDevices {
-                            if device == bltDevice.ToString() {
+                            if device.Address == bltDevice.Address {
                                 exists = true
                                 break;
                             }
                         }
 
                         if !exists {
-                            scannedDevices = append(scannedDevices, bltDevice.ToString())
+                            scannedDevices = append(scannedDevices, bltDevice)
                         }
                     }
                 }
             }()
         }
-        //-------------------------------------------------
 
         // Connect to device click ------------------------
         mousePos := rl.GetMousePosition()
         if rl.CheckCollisionPointRec(mousePos, listViewBounds) {
             if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
                 selectedDevice := scannedDevices[selectedDeviceIdx]
-                log.Printf("Selected %s", selectedDevice)
+                log.Printf("Selected %v", selectedDevice)
+
+
+                // TODO: Detect device type on click
+                hrMonitorCh := make(chan uint8)
+                go state.BluetoothCtl.ConnectToHrMonitor(selectedDevice.Address, hrMonitorCh)
+                go func() {
+                    for {
+                        hrValue, ok := <-hrMonitorCh
+                        if !ok {
+                            break
+                        }
+
+                        log.Printf("HR: %d", hrValue)
+                        currentHeartRate = hrValue
+                    }
+                }()
             }
         }
-        //-------------------------------------------------
     }
-    //====================================================
+}
+
+// TODO: no 2 same type devices
+// no more than 2 devices
+func canConnect(selectedDevice bt.BluetoothDevice) {
+    
 }
 
 func (state *AppState) draw() {
@@ -228,7 +246,6 @@ func (state *AppState) draw() {
                 Height: defaultBtnSize,
             }, "End workout")
 
-            // Draw some text
             rl.DrawText(
                 fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
                     state.CurrentInterval.TargetHigh),
@@ -246,7 +263,7 @@ func (state *AppState) draw() {
                 rl.Black)
 
             rl.DrawText(
-                fmt.Sprintf("Current HR: %d", 0),
+                fmt.Sprintf("Current HR: %d", currentHeartRate),
                 10, 70, 20,
                 rl.Black)
 
@@ -282,7 +299,7 @@ func (state *AppState) draw() {
 
         selectedDeviceIdx = gui.ListViewEx(
             listViewBounds,
-            scannedDevices,
+            bt.ListToString(&scannedDevices),
             nil,
             nil,
             selectedDeviceIdx)

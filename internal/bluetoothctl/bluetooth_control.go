@@ -16,19 +16,36 @@ type BluetoothControl struct {
 
 type BluetoothDevice struct {
     Name string
-    Address string
+    Address bluetooth.Address
+    Type DeviceType
 }
 
+type DeviceType int
+const (
+    Unknown DeviceType = iota
+    HeartRateMonitor
+    SmartTrainer
+)
+
 var (
-    hearRateServiceUUID = bluetooth.ServiceUUIDHeartRate
-    hearRateCharacteristicUUID = bluetooth.CharacteristicUUIDHeartRateMeasurement
+    heartRateServiceUUID = bluetooth.ServiceUUIDHeartRate
+    heartRateCharacteristicUUID = bluetooth.CharacteristicUUIDHeartRateMeasurement
 
     cyclingPowerServiceUUID = bluetooth.ServiceUUIDCyclingPower
     cyclingPowerCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerMeasurement
 )
 
 func (device *BluetoothDevice) ToString() string {
-    return fmt.Sprintf("%s - %s", device.Name, device.Address)
+    return fmt.Sprintf("%s - %s", device.Name, device.Address.String())
+}
+
+func ListToString(devices *[]BluetoothDevice) []string {
+    result := []string{}
+    for _, device := range *devices {
+        result = append(result, device.ToString())
+    }
+
+    return result
 }
 
 func Init() (bt BluetoothControl) {
@@ -50,18 +67,16 @@ func (bt *BluetoothControl) Scan(ch chan BluetoothDevice, devices []string) {
     scanDuration := 10 * time.Second
     endScanTime := time.Now().Add(scanDuration)
     err = bt.Adapter.Scan(func(a *bluetooth.Adapter, sr bluetooth.ScanResult) {
-
         // bluetooth headphone testing
         // todo: show only valid devices (hr monitor and smart trainers)
         // do not allow two types on same device connection (no 2 HR monitors)
         advPayload := sr.AdvertisementPayload
-        if advPayload.HasServiceUUID(bluetooth.New16BitUUID(0x111E)) {
-            log.Printf("%s", sr.LocalName())
-        }
-
-        ch <- BluetoothDevice{
-            Name: sr.LocalName(),
-            Address: sr.Address.String(),
+        if advPayload.HasServiceUUID(bluetooth.New16BitUUID(heartRateServiceUUID.Get16Bit())) {
+            ch <- BluetoothDevice{
+                Name: sr.LocalName(),
+                Address: sr.Address,
+                Type: HeartRateMonitor,
+            }
         }
 
         if (time.Now().After(endScanTime)) {
@@ -81,48 +96,61 @@ func (bt *BluetoothControl) Scan(ch chan BluetoothDevice, devices []string) {
 // note: currently only heart rate monitor
 // fix: add  param which is the device to detect the type of device
 // and possibly block, when connecting is not allowed (ex: type of device already connected)
-func (bt *BluetoothControl) Connect(deviceAddress bluetooth.Address, ch chan uint8) {
+func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, ch chan uint8) {
     device, err := bt.Adapter.Connect(deviceAddress, bluetooth.ConnectionParams{})
     if err != nil {
         log.Printf("Could not connect to device. Error: %s \n", err)
+        close(ch)
         return;
     }
 
-    services, err := device.DiscoverServices([]bluetooth.UUID{hearRateServiceUUID})
+    bt.Adapter.StopScan()
+
+    services, err := device.DiscoverServices([]bluetooth.UUID{heartRateServiceUUID})
     if err != nil {
         log.Printf("Failed to discover services. Error: %s \n", err)
         device.Disconnect()
+        close(ch)
         return
     }
 
     if len(services) == 0 {
         log.Println("Could not find any services")
         device.Disconnect()
+        close(ch)
         return
     }
 
     service := services[0]
-    characteristics, err := service.DiscoverCharacteristics([]bluetooth.UUID{hearRateCharacteristicUUID})
+    characteristics, err := service.DiscoverCharacteristics([]bluetooth.UUID{heartRateCharacteristicUUID})
     if err != nil {
         log.Printf("Failed to discover characteristics. Error: %s \n", err)
         device.Disconnect()
+        close(ch)
         return
     }
 
     if len(characteristics) == 0 {
         log.Println("Could not find any characteristics")
         device.Disconnect()
+        close(ch)
         return
     }
 
     characteristic := characteristics[0]
     log.Printf("Found characteristic %s", characteristic.UUID().String())
 
-    characteristic.EnableNotifications(func(buf []byte) {
+    err = characteristic.EnableNotifications(func(buf []byte) {
         value := uint8(buf[1])
         ch <-value
     })
 
-    select{}
+    if err != nil {
+        log.Printf("Error reading value: %s", err)
+        close(ch)
+    }
+
+    // Do I need this??
+    //select{}
 }
 
