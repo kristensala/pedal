@@ -137,6 +137,8 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
         return
     }
 
+    bt.HrMonitorConnected = true
+
     characteristic := characteristics[0]
     log.Printf("Found characteristic %s", characteristic.UUID().String())
 
@@ -146,11 +148,13 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
     })
 
     if err != nil {
+        bt.HrMonitorConnected = false
+
         log.Printf("Error reading value: %s", err)
         close(ch)
     }
+}
 
-    // Do I need this??
-    //select{}
+func (bt *BluetoothControl) ConnectToSmartTrainer(deviceAddress bluetooth.Address, ch chan uint8) {
 }
 

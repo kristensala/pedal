@@ -58,7 +58,6 @@ var (
     listViewBounds rl.Rectangle
 
     currentHeartRate uint8
-    currentPower uint8
 )
 
 type ApplicationScreen int
@@ -183,32 +182,29 @@ func (state *AppState) update() {
         if rl.CheckCollisionPointRec(mousePos, listViewBounds) {
             if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
                 selectedDevice := scannedDevices[selectedDeviceIdx]
-                log.Printf("Selected %v", selectedDevice)
 
+                if selectedDevice.Type == bt.HeartRateMonitor && !state.BluetoothCtl.HrMonitorConnected {
+                    hrMonitorCh := make(chan uint8)
+                    go state.BluetoothCtl.ConnectToHrMonitor(selectedDevice.Address, hrMonitorCh)
+                    go func() {
+                        for {
+                            hrValue, ok := <-hrMonitorCh
+                            if !ok {
+                                break
+                            }
 
-                // TODO: Detect device type on click
-                hrMonitorCh := make(chan uint8)
-                go state.BluetoothCtl.ConnectToHrMonitor(selectedDevice.Address, hrMonitorCh)
-                go func() {
-                    for {
-                        hrValue, ok := <-hrMonitorCh
-                        if !ok {
-                            break
+                            log.Printf("HR: %d", hrValue)
+                            currentHeartRate = hrValue
                         }
-
-                        log.Printf("HR: %d", hrValue)
-                        currentHeartRate = hrValue
-                    }
-                }()
+                    }()
+                }
+ 
+                //TODO:
+                if selectedDevice.Type == bt.SmartTrainer && !state.BluetoothCtl.SmartTrainerConnected {
+                }
             }
         }
     }
-}
-
-// TODO: no 2 same type devices
-// no more than 2 devices
-func canConnect(selectedDevice bt.BluetoothDevice) {
-    
 }
 
 func (state *AppState) draw() {
