@@ -6,6 +6,7 @@ import (
 	"log"
 	bt "pedal/internal/bluetoothctl"
 	"pedal/internal/fit"
+	"time"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -50,12 +51,19 @@ var (
     scanBtnClicked bool = false
     devicesBtnClicked bool = false
     endWorkoutClicked bool = false
+    startWorkoutClicked bool = false
 
     scannedDevices []bt.BluetoothDevice = []bt.BluetoothDevice{}
 
     listViewBounds rl.Rectangle
 
     currentHeartRate uint8
+
+    ticker *time.Ticker
+    stopTicker chan struct{}
+
+    workoutInProgress bool = false
+    workoutStopped bool = true
 )
 
 type ApplicationScreen int
@@ -120,12 +128,36 @@ func (state *AppState) update() {
 
     //================ Workout screen =================
     if state.Screen == WorkoutScreen {
-        if rl.IsKeyDown(rl.KeyRight) {
+        if startWorkoutClicked && !workoutInProgress {
+            workoutInProgress = true
+            ticker = time.NewTicker(1 * time.Second)
+            stopTicker = make(chan struct{})
+
+            go func() {
+                for {
+                    select {
+                    case <-ticker.C:
+                        state.WorkoutElapsedTime += 1
+                        state.moveNeedleBasedOnElapsedTime()
+                        state.setIntervalBasedOnElapsedTime()
+                    case <-stopTicker:
+                        workoutInProgress = false
+                        ticker.Stop()
+                        return
+                    }
+                }
+            }()
+        }
+
+        if endWorkoutClicked && workoutInProgress {
+            close(stopTicker)
+        }
+        /*if rl.IsKeyDown(rl.KeyRight) && state.WorkoutElapsedTime < uint32(state.DataSet.TotalDurationSeconds) {
             state.WorkoutElapsedTime += 1
             state.moveNeedleBasedOnElapsedTime()
             state.setIntervalBasedOnElapsedTime()
             return
-        }
+        }*/
 
         if devicesBtnClicked {
             state.Screen = DevicesScreen
@@ -238,6 +270,13 @@ func (state *AppState) draw() {
                 Width: 100,
                 Height: defaultBtnSize,
             }, "End workout")
+
+            startWorkoutClicked = gui.Button(rl.Rectangle{
+                X: float32(rl.GetScreenWidth()) - 310,
+                Y: 10,
+                Width: 100,
+                Height: defaultBtnSize,
+            }, "Start workout")
 
             rl.DrawText(
                 fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
