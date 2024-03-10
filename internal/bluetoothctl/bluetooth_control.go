@@ -27,6 +27,10 @@ const (
     SmartTrainer
 )
 
+const (
+    scanDuration = 10 * time.Second
+)
+
 var (
     heartRateServiceUUID = bluetooth.ServiceUUIDHeartRate
     heartRateCharacteristicUUID = bluetooth.CharacteristicUUIDHeartRateMeasurement
@@ -64,18 +68,22 @@ func (bt *BluetoothControl) Scan(ch chan BluetoothDevice, devices []string) {
 
     log.Println("Start scanning")
 
-    scanDuration := 10 * time.Second
     endScanTime := time.Now().Add(scanDuration)
     err = bt.Adapter.Scan(func(a *bluetooth.Adapter, sr bluetooth.ScanResult) {
-        // bluetooth headphone testing
-        // todo: show only valid devices (hr monitor and smart trainers)
-        // do not allow two types on same device connection (no 2 HR monitors)
         advPayload := sr.AdvertisementPayload
         if advPayload.HasServiceUUID(bluetooth.New16BitUUID(heartRateServiceUUID.Get16Bit())) {
             ch <- BluetoothDevice{
                 Name: sr.LocalName(),
                 Address: sr.Address,
                 Type: HeartRateMonitor,
+            }
+        }
+
+        if advPayload.HasServiceUUID(bluetooth.New16BitUUID(cyclingPowerServiceUUID.Get16Bit())) {
+            ch <- BluetoothDevice{
+                Name: sr.LocalName(),
+                Address: sr.Address,
+                Type: SmartTrainer,
             }
         }
 
@@ -93,9 +101,6 @@ func (bt *BluetoothControl) Scan(ch chan BluetoothDevice, devices []string) {
     }
 }
 
-// note: currently only heart rate monitor
-// fix: add  param which is the device to detect the type of device
-// and possibly block, when connecting is not allowed (ex: type of device already connected)
 func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, ch chan uint8) {
     device, err := bt.Adapter.Connect(deviceAddress, bluetooth.ConnectionParams{})
     if err != nil {
@@ -104,6 +109,8 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
         return;
     }
 
+    // note: not sure if this is in the correct place
+    // or is it even needed
     bt.Adapter.StopScan()
 
     services, err := device.DiscoverServices([]bluetooth.UUID{heartRateServiceUUID})
@@ -149,6 +156,7 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
 
     if err != nil {
         bt.HrMonitorConnected = false
+        device.Disconnect()
 
         log.Printf("Error reading value: %s", err)
         close(ch)

@@ -38,8 +38,6 @@ const (
     canvasMaxPowerDisplay int32 = 600
 )
 
-// Get the current workout state
-// through the needle pos
 var (
     needlePosX float64 = 0
     needlePosPercent float64 = 0
@@ -122,11 +120,10 @@ func (state *AppState) update() {
 
     //================ Workout screen =================
     if state.Screen == WorkoutScreen {
-        // Move the needle manually for testing
         if rl.IsKeyDown(rl.KeyRight) {
-            needlePosX = needlePosX + needleIncrementX
-            needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
-            state.getBlockBasedOnNeedlePos()
+            state.WorkoutElapsedTime += 1
+            state.moveNeedleBasedOnElapsedTime()
+            state.setIntervalBasedOnElapsedTime()
             return
         }
 
@@ -402,11 +399,12 @@ func renderCanvas(data fit.DataSet, height float32) rl.Rectangle {
     return canvas
 }
 
-func (state *AppState) getBlockBasedOnNeedlePos() {
-    // gives me the actual second we are on
-    // based on the needle position on canvas
-    state.WorkoutElapsedTime = uint32(needlePosX / needleIncrementX)
+func (state *AppState) moveNeedleBasedOnElapsedTime() {
+    needlePosX = float64(state.WorkoutElapsedTime) * needleIncrementX
+    needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
+}
 
+func (state *AppState) setIntervalBasedOnElapsedTime() {
     if (len(state.DataSet.Intervals) == 0) {
         return
     }
