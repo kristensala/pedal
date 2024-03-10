@@ -67,7 +67,7 @@ const (
     WorkoutCompletedScreen
 )
 
-func InitApp() (state AppState) {
+func initApp() (state AppState) {
     state.Screen = TitleScreen
     state.WorkoutElapsedTime = 0
     state.CurrentIntervalNumber = 0
@@ -77,7 +77,7 @@ func InitApp() (state AppState) {
 }
 
 func main() {
-    appState := InitApp()
+    appState := initApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
 	defer rl.CloseWindow()
@@ -89,18 +89,18 @@ func main() {
         (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
 
 	for !rl.WindowShouldClose() {
-        appState.Update()
+        appState.update()
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 
-        appState.Draw()
+        appState.draw()
 
 		rl.EndDrawing()
 	}
 }
 
-func (state *AppState) Update() {
+func (state *AppState) update() {
     //================ Title screen =================
     if (state.Screen == TitleScreen) {
         droppedFile := make([]string, 0)
@@ -125,7 +125,7 @@ func (state *AppState) Update() {
         if rl.IsKeyDown(rl.KeyRight) {
             needlePosX = needlePosX + needleIncrementX
             needlePosPercent = (needlePosX * 100) / float64(rl.GetScreenWidth())
-            state.GetBlockBasedOnNeedlePos()
+            state.getBlockBasedOnNeedlePos()
             return
         }
 
@@ -141,7 +141,6 @@ func (state *AppState) Update() {
 
     //================= Devices screen =================
     if state.Screen == DevicesScreen {
-        // move back to the workout screen
         if (backBtnClicked) {
             state.Screen = WorkoutScreen
             return;
@@ -164,15 +163,15 @@ func (state *AppState) Update() {
                     if len(scannedDevices) == 0 {
                         scannedDevices = append(scannedDevices, bltDevice.ToString())
                     } else {
-                        hasDuplicate := false
+                        exists := false
                         for _, device := range scannedDevices {
                             if device == bltDevice.ToString() {
-                                hasDuplicate = true
+                                exists = true
                                 break;
                             }
                         }
 
-                        if !hasDuplicate {
+                        if !exists {
                             scannedDevices = append(scannedDevices, bltDevice.ToString())
                         }
                     }
@@ -185,8 +184,8 @@ func (state *AppState) Update() {
         mousePos := rl.GetMousePosition()
         if rl.CheckCollisionPointRec(mousePos, listViewBounds) {
             if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
-                log.Println("clicked inside the list")
-                // TODO: select the device on click here
+                selectedDevice := scannedDevices[selectedDeviceIdx]
+                log.Printf("Selected %s", selectedDevice)
             }
         }
         //-------------------------------------------------
@@ -194,12 +193,10 @@ func (state *AppState) Update() {
     //====================================================
 }
 
-func (state *AppState) Draw() {
+func (state *AppState) draw() {
     if state.Screen == TitleScreen {
         rl.DrawText("Drop a .FIT workout file here!",
-            190,
-            200,
-            20,
+            190, 200, 20,
             rl.LightGray)
 
         return
@@ -283,12 +280,12 @@ func (state *AppState) Draw() {
             Width: 400,
         }
 
-        listActive = gui.ListViewEx(
+        selectedDeviceIdx = gui.ListViewEx(
             listViewBounds,
             scannedDevices,
-            &selectedDeviceIdx,
             nil,
-            listActive)
+            nil,
+            selectedDeviceIdx)
     }
 }
 
@@ -392,7 +389,7 @@ func renderCanvas(data fit.DataSet, height float32) rl.Rectangle {
     return canvas
 }
 
-func (state *AppState) GetBlockBasedOnNeedlePos() {
+func (state *AppState) getBlockBasedOnNeedlePos() {
     // gives me the actual second we are on
     // based on the needle position on canvas
     state.WorkoutElapsedTime = uint32(needlePosX / needleIncrementX)
