@@ -1,7 +1,6 @@
 package bluetoothctl
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -27,6 +26,7 @@ const (
     SmartTrainer
 )
 
+
 const (
     scanDuration = 10 * time.Second
 )
@@ -37,20 +37,12 @@ var (
 
     cyclingPowerServiceUUID = bluetooth.ServiceUUIDCyclingPower
     cyclingPowerCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerMeasurement
+    cyclingPowerFeatureCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerFeature
+    cyclingPowerVectorCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerVector
+
+    cyclingSpeedAndCadenceServiceUUID = bluetooth.ServiceUUIDCyclingSpeedAndCadence
 )
 
-func (device *BluetoothDevice) ToString() string {
-    return fmt.Sprintf("%s - %s", device.Name, device.Address.String())
-}
-
-func ListToString(devices *[]BluetoothDevice) []string {
-    result := []string{}
-    for _, device := range *devices {
-        result = append(result, device.ToString())
-    }
-
-    return result
-}
 
 func Init() (bt BluetoothControl) {
     bt.Adapter = bluetooth.DefaultAdapter
@@ -164,5 +156,53 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
 }
 
 func (bt *BluetoothControl) ConnectToSmartTrainer(deviceAddress bluetooth.Address, ch chan uint8) {
+    bt.Adapter.StopScan();
+
+    device, err := bt.Adapter.Connect(deviceAddress, bluetooth.ConnectionParams{})
+    if err != nil {
+        log.Printf("Could not connect to smart trainer: %s", err)
+        close(ch)
+        return
+    }
+
+    services, err := device.DiscoverServices([]bluetooth.UUID{cyclingPowerServiceUUID})
+    if err != nil {
+        log.Printf("Failed to discover services. Error: %s \n", err)
+        device.Disconnect()
+        close(ch)
+        return
+    }
+
+    service := services[0]
+    characteristics, err := service.DiscoverCharacteristics([]bluetooth.UUID{cyclingPowerCharacteristicUUID})
+    if err != nil {
+        log.Printf("Failed to discover characteristics. Error: %s \n", err)
+        device.Disconnect()
+        close(ch)
+        return
+    }
+
+    if len(characteristics) == 0 {
+        log.Println("Could not find any characteristics")
+        device.Disconnect()
+        close(ch)
+        return
+    }
+
+    characteristic := characteristics[0]
+    log.Printf("Found characteristics %v", characteristic)
+
+    err = characteristic.EnableNotifications(func(buf []byte) {
+        log.Printf("value: %b", buf)
+    })
+
+    if err != nil {
+        //bt.HrMonitorConnected = false
+        device.Disconnect()
+
+        log.Printf("Error reading value: %s", err)
+        close(ch)
+    }
+
 }
 

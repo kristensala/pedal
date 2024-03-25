@@ -22,14 +22,6 @@ type AppState struct {
     BluetoothCtl bt.BluetoothControl
 }
 
-// TODO:
-// Needle state on canvas
-type NeedleState struct {
-    PosX float64
-    PosPercentage float64
-    IncrementX float64
-}
-
 const (
     windowHeight = 450
     windowWidth = 800
@@ -37,15 +29,16 @@ const (
 
     defaultBtnSize float32 = 30
     canvasMaxPowerDisplay int32 = 600
+
+    // Colors
+
+    // Fonts
 )
 
 var (
     needlePosX float64 = 0
     needlePosPercent float64 = 0
     needleIncrementX float64 = 0
-
-    listActive int32 = 2
-    selectedDeviceIdx int32 = int32(-1)
 
     backBtnClicked bool = false
     scanBtnClicked bool = false
@@ -54,16 +47,17 @@ var (
     startWorkoutClicked bool = false
 
     scannedDevices []bt.BluetoothDevice = []bt.BluetoothDevice{}
-
+    selectedDeviceIdx int32 = int32(0)
     listViewBounds rl.Rectangle
 
     currentHeartRate uint8
+    currentPower uint8
+    currentCadence uint8
 
     ticker *time.Ticker
     stopTicker chan struct{}
 
     workoutInProgress bool = false
-    workoutStopped bool = true
 )
 
 type ApplicationScreen int
@@ -136,6 +130,10 @@ func (state *AppState) update() {
             go func() {
                 for {
                     select {
+                    // TODO: on each tick read
+                    // timestamp; power;hr;cadence
+                    // and write to DB (could use a queue probably)
+                    // TODO later: Also display hr and power and cadence on canvas
                     case <-ticker.C:
                         state.WorkoutElapsedTime += 1
                         state.moveNeedleBasedOnElapsedTime()
@@ -210,6 +208,14 @@ func (state *AppState) update() {
         mousePos := rl.GetMousePosition()
         if rl.CheckCollisionPointRec(mousePos, listViewBounds) {
             if rl.IsMouseButtonPressed(rl.MouseLeftButton) {
+                if len(scannedDevices) == 0 {
+                    return
+                }
+
+                if len(scannedDevices) < int(selectedDeviceIdx) {
+                    log.Printf("how did i get here. Selected index: %d", selectedDeviceIdx)
+                    return;
+                }
                 selectedDevice := scannedDevices[selectedDeviceIdx]
 
                 if selectedDevice.Type == bt.HeartRateMonitor && !state.BluetoothCtl.HrMonitorConnected {
@@ -228,8 +234,11 @@ func (state *AppState) update() {
                     }()
                 }
  
-                //TODO:
                 if selectedDevice.Type == bt.SmartTrainer && !state.BluetoothCtl.SmartTrainerConnected {
+                    //TODO: listen smart trainer power and cadence
+                    log.Println("Connecting to smart trainer")
+                    powerChannel := make(chan uint8)
+                    go state.BluetoothCtl.ConnectToSmartTrainer(selectedDevice.Address, powerChannel)
                 }
             }
         }
