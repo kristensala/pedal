@@ -26,7 +26,6 @@ const (
     SmartTrainer
 )
 
-
 const (
     scanDuration = 10 * time.Second
 )
@@ -42,7 +41,6 @@ var (
 
     cyclingSpeedAndCadenceServiceUUID = bluetooth.ServiceUUIDCyclingSpeedAndCadence
 )
-
 
 func Init() (bt BluetoothControl) {
     bt.Adapter = bluetooth.DefaultAdapter

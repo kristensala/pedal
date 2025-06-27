@@ -45,6 +45,7 @@ var (
     devicesBtnClicked bool = false
     endWorkoutClicked bool = false
     startWorkoutClicked bool = false
+    freeRideBtnClicked bool = false
 
     scannedDevices []bt.BluetoothDevice = []bt.BluetoothDevice{}
     selectedDeviceIdx int32 = int32(0)
@@ -58,6 +59,10 @@ var (
     stopTicker chan struct{}
 
     workoutInProgress bool = false
+
+	heart_icon_texture rl.Texture2D
+	power_icon_texture rl.Texture2D
+	time_icon_texture rl.Texture2D
 )
 
 type ApplicationScreen int
@@ -82,13 +87,26 @@ func main() {
     appState := initApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
+
+	heart_icon := rl.LoadImage("./assets/heart.png")
+	heart_icon_texture = rl.LoadTextureFromImage(heart_icon)
+	rl.UnloadImage(heart_icon)
+
+	power_icon := rl.LoadImage("./assets/power.png")
+	power_icon_texture = rl.LoadTextureFromImage(power_icon)
+	rl.UnloadImage(power_icon)
+
+	time_icon := rl.LoadImage("./assets/clock.png")
+	time_icon_texture = rl.LoadTextureFromImage(time_icon)
+	rl.UnloadImage(time_icon)
+
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)
 
-    rl.SetWindowPosition(
+    /*rl.SetWindowPosition(
         (rl.GetMonitorWidth(0) - (windowWidth / 2)),
-        (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))
+        (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))*/
 
 	for !rl.WindowShouldClose() {
         appState.update()
@@ -100,6 +118,10 @@ func main() {
 
 		rl.EndDrawing()
 	}
+
+	rl.UnloadTexture(heart_icon_texture)
+	rl.UnloadTexture(power_icon_texture)
+	rl.UnloadTexture(time_icon_texture)
 }
 
 func (state *AppState) update() {
@@ -117,6 +139,12 @@ func (state *AppState) update() {
                 state.Screen = WorkoutScreen
             }
         }
+
+        if freeRideBtnClicked {
+            state.Screen = WorkoutScreen
+            return
+        }
+
         return
     }
 
@@ -212,6 +240,10 @@ func (state *AppState) update() {
                     return
                 }
 
+				if selectedDeviceIdx < 0 {
+					return
+				}
+
                 if len(scannedDevices) < int(selectedDeviceIdx) {
                     log.Printf("how did i get here. Selected index: %d", selectedDeviceIdx)
                     return;
@@ -247,72 +279,135 @@ func (state *AppState) update() {
 
 func (state *AppState) draw() {
     if state.Screen == TitleScreen {
-        rl.DrawText("Drop a .FIT workout file here!",
+        /* Free ride button */
+        freeRideBtnClicked = gui.Button(rl.Rectangle{
+            X: float32(rl.GetScreenWidth()) - (20 + 100),
+            Y: 10,
+            Width: 100,
+            Height: defaultBtnSize,
+        }, "Free ride")
+
+        rl.DrawText("DROP .FIT FILE HERE",
             190, 200, 20,
             rl.LightGray)
 
         return
     }
 
+	// @todo: make a proper grid
     if state.Screen == WorkoutScreen {
         if len(state.DataSet.Intervals) > 0 {
-            // Settings button
-            gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - (10 + defaultBtnSize),
-                Y: 10,
-                Width: defaultBtnSize,
-                Height: defaultBtnSize,
-            }, gui.IconText(gui.ICON_GEAR_BIG, ""))
-
-            // Devices button
-            devicesBtnClicked = gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - (50 + defaultBtnSize),
-                Y: 10,
-                Width: defaultBtnSize,
-                Height: defaultBtnSize,
-            }, gui.IconText(gui.ICON_TOOLS, ""))
-
-
-            endWorkoutClicked = gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - 195,
-                Y: 10,
-                Width: 100,
-                Height: defaultBtnSize,
-            }, "End workout")
-
-            startWorkoutClicked = gui.Button(rl.Rectangle{
-                X: float32(rl.GetScreenWidth()) - 310,
-                Y: 10,
-                Width: 100,
-                Height: defaultBtnSize,
-            }, "Start workout")
-
-            rl.DrawText(
-                fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
-                    state.CurrentInterval.TargetHigh),
-                10, 10, 20,
-                rl.Black)
-
-            rl.DrawText(
-                fmt.Sprintf("Interval: %d", state.CurrentInterval.DurationSeconds),
-                10, 30, 20,
-                rl.Black)
-
-            rl.DrawText(
-                fmt.Sprintf("Elapsed time: %d", state.WorkoutElapsedTime),
-                10, 50, 20,
-                rl.Black)
-
-            rl.DrawText(
-                fmt.Sprintf("Current HR: %d", currentHeartRate),
-                10, 70, 20,
-                rl.Black)
-
             state.drawWorkoutGraph()
-        } else {
-            log.Print("Could not read any data from fit file")
-            state.Screen = TitleScreen
         }
+
+        // Settings button
+        gui.Button(rl.Rectangle{
+            X: float32(rl.GetScreenWidth()) - (10 + defaultBtnSize),
+            Y: 10,
+            Width: defaultBtnSize,
+            Height: defaultBtnSize,
+        }, gui.IconText(gui.ICON_GEAR_BIG, ""))
+
+        // Devices button
+        devicesBtnClicked = gui.Button(rl.Rectangle{
+            X: float32(rl.GetScreenWidth()) - (50 + defaultBtnSize),
+            Y: 10,
+            Width: defaultBtnSize,
+            Height: defaultBtnSize,
+        }, gui.IconText(gui.ICON_TOOLS, ""))
+
+
+        endWorkoutClicked = gui.Button(rl.Rectangle{
+            X: float32(rl.GetScreenWidth()) - 195,
+            Y: 10,
+            Width: 100,
+            Height: defaultBtnSize,
+        }, "End workout")
+
+        startWorkoutClicked = gui.Button(rl.Rectangle{
+            X: float32(rl.GetScreenWidth()) - 310,
+            Y: 10,
+            Width: 100,
+            Height: defaultBtnSize,
+        }, "Start workout")
+
+        rl.DrawText(
+            fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
+                state.CurrentInterval.TargetHigh),
+            10, 10, 20,
+            rl.Black)
+
+        rl.DrawText(
+            fmt.Sprintf("Interval: %d", state.CurrentInterval.DurationSeconds),
+            10, 30, 20,
+            rl.Black)
+
+		// heart rate
+		heart_rect := rl.Rectangle{
+			X: 220,
+			Y: 100,
+			Width: 100,
+			Height: 50,
+		}
+		rl.DrawRectangleRec(heart_rect, rl.Gray)
+
+		rl.DrawTextureEx(
+			heart_icon_texture,
+			rl.NewVector2(
+				heart_rect.X + 10,
+				(heart_rect.Height / 2) + heart_rect.Y - (float32(heart_icon_texture.Height) * 0.05) / 2),
+			0,
+			.05,
+			rl.Black)
+
+		rl.DrawText(
+			fmt.Sprintf("%d", currentHeartRate),
+			int32(heart_rect.X) + 50, (int32(heart_rect.Height) / 2) + int32(heart_rect.Y) - 10, 20,
+			rl.Black)
+
+		// power
+		power_rect := rl.Rectangle{
+			X: 100,
+			Y: 100,
+			Width: 100,
+			Height: 50,
+		}
+		rl.DrawRectangleRec(power_rect, rl.Gray)
+		rl.DrawTextureEx(
+			power_icon_texture,
+			rl.NewVector2(
+				power_rect.X + 10,
+				(power_rect.Height / 2) + power_rect.Y - (float32(power_icon_texture.Height) / 2)),
+			0,
+			1,
+			rl.Black)
+
+		rl.DrawText(
+			fmt.Sprintf("%d", currentPower),
+			int32(power_rect.X) + 50, (int32(power_rect.Height) / 2) + int32(power_rect.Y) - 10, 20,
+			rl.Black)
+
+		// ride time data
+		ride_time_rect := rl.Rectangle{
+			X: 100,
+			Y: 170,
+			Width: 220,
+			Height: 50,
+		}
+		rl.DrawRectangleRec(ride_time_rect, rl.Gray)
+		rl.DrawTextureEx(
+			time_icon_texture,
+			rl.NewVector2(
+				ride_time_rect.X + 10,
+				(power_rect.Height / 2) + ride_time_rect.Y - (float32(time_icon_texture.Height) / 2)),
+			0,
+			1,
+			rl.Black)
+
+		rl.DrawText(
+			convertSecondsToHHMMSS(int32(state.WorkoutElapsedTime)),
+			int32(ride_time_rect.X) + 50, (int32(ride_time_rect.Height) / 2) + int32(ride_time_rect.Y) - 10, 20,
+			rl.Black)
     }
 
     if (state.Screen == DevicesScreen) {
@@ -481,3 +576,11 @@ func (state *AppState) setIntervalBasedOnElapsedTime() {
     }
 }
 
+// @todo: should have utils file
+func convertSecondsToHHMMSS(seconds int32) string {
+	hours := seconds / 3600
+	minutes := (seconds % 3600) / 60
+	sec := seconds % 60
+	
+	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, sec)
+}
