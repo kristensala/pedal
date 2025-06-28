@@ -44,8 +44,15 @@ var (
     backBtnClicked bool = false
     scanBtnClicked bool = false
     devicesBtnClicked bool = false
+
+	// Saves current workout and resets data
     endWorkoutClicked bool = false
     startWorkoutClicked bool = false
+
+	// TODO: remove.
+	// Free ride should be default and if I want to use a workout
+	// then just drop a file and that automagically loads the needed stuff.
+	// Also drop the title screen
     freeRideBtnClicked bool = false
 
     scannedDevices []bt.BluetoothDevice = []bt.BluetoothDevice{}
@@ -61,7 +68,7 @@ var (
 
     workoutInProgress bool = false
 
-	// @todo: new fields
+	// @todo: new fields, should use as an alternative to workoutInProgress probably
 	workoutStarted bool = false
 	workoutPaused bool = false
 
@@ -69,7 +76,7 @@ var (
 	power_icon_texture rl.Texture2D
 	time_icon_texture rl.Texture2D
 
-	noPowerTicker *time.Ticker = nil
+	inactivityTimer *time.Ticker = nil
 )
 
 type ApplicationScreen int
@@ -82,7 +89,7 @@ const (
 )
 
 func initApp() (state AppState) {
-    state.Screen = TitleScreen
+    state.Screen = WorkoutScreen
     state.WorkoutElapsedTime = 0
     state.CurrentIntervalNumber = 0
     state.NextIntervalStartsAt = 0
@@ -173,8 +180,8 @@ func (state *AppState) update() {
                         workoutInProgress = false
                         ticker.Stop()
 
-						if noPowerTicker != nil {
-							noPowerTicker = nil
+						if inactivityTimer != nil {
+							inactivityTimer = nil
 						}
                         return
                     }
@@ -182,16 +189,17 @@ func (state *AppState) update() {
             }()
         }
 
-		if workoutInProgress && currentPower == 0 && noPowerTicker == nil {
-			noPowerTicker = time.NewTicker(1 * time.Second)
+		if workoutInProgress && currentPower == 0 && inactivityTimer == nil {
+			inactivityTimer = time.NewTicker(1 * time.Second)
             go func() {
                 for {
-					if noPowerTicker == nil {
+					if inactivityTimer == nil {
+						state.InactivityTime = 0
 						break
 					}
 
                     select {
-                    case <-noPowerTicker.C:
+                    case <-inactivityTimer.C:
                         state.InactivityTime += 1
 					}
                 }
@@ -202,8 +210,6 @@ func (state *AppState) update() {
 		if state.InactivityTime >= 5 && workoutInProgress {
 			state.InactivityTime = 0
 			close(stopTicker)
-
-			log.Println("workout paused")
 		}
 
         if devicesBtnClicked {
