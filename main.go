@@ -20,6 +20,7 @@ type AppState struct {
     CurrentIntervalNumber int
     NextIntervalStartsAt int
     BluetoothCtl bt.BluetoothControl
+	InactivityTime uint32
 }
 
 const (
@@ -52,7 +53,7 @@ var (
     listViewBounds rl.Rectangle
 
     currentHeartRate uint8
-    currentPower uint8
+    currentPower uint16
     currentCadence uint8
 
     ticker *time.Ticker
@@ -60,9 +61,15 @@ var (
 
     workoutInProgress bool = false
 
+	// @todo: new fields
+	workoutStarted bool = false
+	workoutPaused bool = false
+
 	heart_icon_texture rl.Texture2D
 	power_icon_texture rl.Texture2D
 	time_icon_texture rl.Texture2D
+
+	noPowerTicker *time.Ticker = nil
 )
 
 type ApplicationScreen int
@@ -150,7 +157,7 @@ func (state *AppState) update() {
 
     //================ Workout screen =================
     if state.Screen == WorkoutScreen {
-        if startWorkoutClicked && !workoutInProgress {
+        if (startWorkoutClicked || currentPower > 0) && !workoutInProgress {
             workoutInProgress = true
             ticker = time.NewTicker(1 * time.Second)
             stopTicker = make(chan struct{})
@@ -158,10 +165,6 @@ func (state *AppState) update() {
             go func() {
                 for {
                     select {
-                    // TODO: on each tick read
-                    // timestamp; power;hr;cadence
-                    // and write to DB (could use a queue probably)
-                    // TODO later: Also display hr and power and cadence on canvas
                     case <-ticker.C:
                         state.WorkoutElapsedTime += 1
                         state.moveNeedleBasedOnElapsedTime()
@@ -169,21 +172,39 @@ func (state *AppState) update() {
                     case <-stopTicker:
                         workoutInProgress = false
                         ticker.Stop()
+
+						if noPowerTicker != nil {
+							noPowerTicker = nil
+						}
                         return
                     }
                 }
             }()
         }
 
-        if endWorkoutClicked && workoutInProgress {
-            close(stopTicker)
-        }
-        /*if rl.IsKeyDown(rl.KeyRight) && state.WorkoutElapsedTime < uint32(state.DataSet.TotalDurationSeconds) {
-            state.WorkoutElapsedTime += 1
-            state.moveNeedleBasedOnElapsedTime()
-            state.setIntervalBasedOnElapsedTime()
-            return
-        }*/
+		if workoutInProgress && currentPower == 0 && noPowerTicker == nil {
+			noPowerTicker = time.NewTicker(1 * time.Second)
+            go func() {
+                for {
+					if noPowerTicker == nil {
+						break
+					}
+
+                    select {
+                    case <-noPowerTicker.C:
+                        state.InactivityTime += 1
+					}
+                }
+            }()
+		}
+
+		// @note: pause workout
+		if state.InactivityTime >= 5 && workoutInProgress {
+			state.InactivityTime = 0
+			close(stopTicker)
+
+			log.Println("workout paused")
+		}
 
         if devicesBtnClicked {
             state.Screen = DevicesScreen
@@ -267,10 +288,20 @@ func (state *AppState) update() {
                 }
  
                 if selectedDevice.Type == bt.SmartTrainer && !state.BluetoothCtl.SmartTrainerConnected {
-                    //TODO: listen smart trainer power and cadence
                     log.Println("Connecting to smart trainer")
-                    powerChannel := make(chan uint8)
-                    go state.BluetoothCtl.ConnectToSmartTrainer(selectedDevice.Address, powerChannel)
+                    powerChannel := make(chan uint16)
+
+					go state.BluetoothCtl.ConnectToSmartTrainer(selectedDevice.Address, powerChannel)
+                    go func() {
+                        for {
+                            power, ok := <-powerChannel
+                            if !ok {
+                                break
+                            }
+
+                            currentPower = power
+                        }
+                    }()
                 }
             }
         }

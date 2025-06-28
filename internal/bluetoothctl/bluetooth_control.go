@@ -3,6 +3,7 @@ package bluetoothctl
 import (
 	"log"
 	"time"
+	"encoding/binary"
 
 	"tinygo.org/x/bluetooth"
 )
@@ -38,6 +39,8 @@ var (
     cyclingPowerCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerMeasurement
     cyclingPowerFeatureCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerFeature
     cyclingPowerVectorCharacteristicUUID = bluetooth.CharacteristicUUIDCyclingPowerVector
+
+	indoorBikeData = bluetooth.CharacteristicUUIDIndoorBikeData
 
     cyclingSpeedAndCadenceServiceUUID = bluetooth.ServiceUUIDCyclingSpeedAndCadence
 )
@@ -153,7 +156,9 @@ func (bt *BluetoothControl) ConnectToHrMonitor(deviceAddress bluetooth.Address, 
     }
 }
 
-func (bt *BluetoothControl) ConnectToSmartTrainer(deviceAddress bluetooth.Address, ch chan uint8) {
+// @todo: should return  error if failed to connect
+// also, what happens if connection is lost?
+func (bt *BluetoothControl) ConnectToSmartTrainer(deviceAddress bluetooth.Address, ch chan uint16) {
     bt.Adapter.StopScan();
 
     device, err := bt.Adapter.Connect(deviceAddress, bluetooth.ConnectionParams{})
@@ -190,8 +195,15 @@ func (bt *BluetoothControl) ConnectToSmartTrainer(deviceAddress bluetooth.Addres
     characteristic := characteristics[0]
     log.Printf("Found characteristics %v", characteristic)
 
+	offset := 2
     err = characteristic.EnableNotifications(func(buf []byte) {
-        log.Printf("value: %b", buf)
+        //log.Printf("Power measurement: %d", buf)
+
+		byteSlice := buf[offset : offset + 2]
+		integerValue := binary.LittleEndian.Uint16(byteSlice)
+        //log.Printf("Power: %d", integerValue)
+
+        ch <-integerValue
     })
 
     if err != nil {
