@@ -23,8 +23,8 @@ type AppState struct {
 }
 
 const (
-    windowHeight = 450
-    windowWidth = 800
+    windowHeight = 550
+    windowWidth = 1000
     fontSize = 30
 
     defaultBtnSize float32 = 30
@@ -33,6 +33,8 @@ const (
     // Colors
 
     // Fonts
+
+	visualDebugMode bool = true
 )
 
 var (
@@ -76,6 +78,8 @@ var (
 	time_icon_texture rl.Texture2D
 
 	inactivityTimer *time.Ticker = nil
+
+	visualDebugColor rl.Color = rl.Blank
 )
 
 type ApplicationScreen int
@@ -97,6 +101,10 @@ func initApp() (state AppState) {
 }
 
 func main() {
+	if visualDebugMode {
+		visualDebugColor = rl.Orange
+	}
+
     appState := initApp()
 
 	rl.InitWindow(windowWidth, windowHeight, "Pedal")
@@ -117,15 +125,17 @@ func main() {
 
 	rl.SetTargetFPS(60)
 
-    /*rl.SetWindowPosition(
-        (rl.GetMonitorWidth(0) - (windowWidth / 2)),
-        (rl.GetMonitorHeight(0) / 2) - (windowHeight / 2))*/
+	// @note: pos window in the center of the screen
+	currentMonitor := rl.GetCurrentMonitor()
+    rl.SetWindowPosition(
+        (rl.GetMonitorWidth(currentMonitor) - (windowWidth / 2)),
+        (rl.GetMonitorHeight(currentMonitor) / 2) - (windowHeight / 2))
 
 	for !rl.WindowShouldClose() {
         appState.update()
 
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.RayWhite)
+		rl.ClearBackground(rl.Black)
 
         appState.draw()
 
@@ -367,7 +377,7 @@ func (state *AppState) draw() {
             Height: defaultBtnSize,
         }, "Start workout")
 
-        rl.DrawText(
+        /*rl.DrawText(
             fmt.Sprintf("Target power: %d - %d", state.CurrentInterval.TargetLow, 
                 state.CurrentInterval.TargetHigh),
             10, 10, 20,
@@ -376,39 +386,27 @@ func (state *AppState) draw() {
         rl.DrawText(
             fmt.Sprintf("Interval: %d", state.CurrentInterval.DurationSeconds),
             10, 30, 20,
-            rl.Black)
+            rl.Black)*/
 
-		// heart rate
-		heart_rect := rl.Rectangle{
-			X: 220,
-			Y: 100,
-			Width: 100,
-			Height: 50,
+		mainViewPadding := 10
+		mainViewWidth := 350
+
+		mainViewRect := rl.Rectangle{
+			X: (windowWidth / 2) - (float32(mainViewWidth) / 2),
+			Y: (windowHeight / 2) - (450 / 2),
+			Width: float32(mainViewWidth),
+			Height: 450,
 		}
-		rl.DrawRectangleRec(heart_rect, rl.Gray)
-
-		rl.DrawTextureEx(
-			heart_icon_texture,
-			rl.NewVector2(
-				heart_rect.X + 10,
-				(heart_rect.Height / 2) + heart_rect.Y - (float32(heart_icon_texture.Height) * 0.05) / 2),
-			0,
-			.05,
-			rl.Black)
-
-		rl.DrawText(
-			fmt.Sprintf("%d", currentHeartRate),
-			int32(heart_rect.X) + 50, (int32(heart_rect.Height) / 2) + int32(heart_rect.Y) - 10, 20,
-			rl.Black)
+		rl.DrawRectangleRec(mainViewRect, rl.Blue)
 
 		// power
 		power_rect := rl.Rectangle{
-			X: 100,
+			X: mainViewRect.X,
 			Y: 100,
-			Width: 100,
-			Height: 50,
+			Width: (mainViewRect.Width / 2) - 10,
+			Height: 70,
 		}
-		rl.DrawRectangleRec(power_rect, rl.Gray)
+		rl.DrawRectangleRec(power_rect, visualDebugColor)
 		rl.DrawTextureEx(
 			power_icon_texture,
 			rl.NewVector2(
@@ -420,30 +418,91 @@ func (state *AppState) draw() {
 
 		rl.DrawText(
 			fmt.Sprintf("%d", currentPower),
-			int32(power_rect.X) + 50, (int32(power_rect.Height) / 2) + int32(power_rect.Y) - 10, 20,
-			rl.Black)
+			int32(power_rect.X) + 50, (int32(power_rect.Height) / 2) + int32(power_rect.Y) - 20, 40,
+			rl.White)
+
+		// avg power
+		avgPowerRect := rl.Rectangle{
+			X: mainViewRect.X,
+			Y: 180,
+			Width: (mainViewRect.Width / 2) - 10,
+			Height: 70,
+		}
+		rl.DrawRectangleRec(avgPowerRect, visualDebugColor)
+		rl.DrawText(
+			"AVG Power",
+			int32(avgPowerRect.X) + 10, (int32(avgPowerRect.Height) / 2) + int32(avgPowerRect.Y) - 30, 20,
+			rl.White)
+
+		rl.DrawText(
+			fmt.Sprintf("%d", 0),
+			int32(avgPowerRect.X) + 10, (int32(avgPowerRect.Height) / 2) + int32(avgPowerRect.Y) - 5, 40,
+			rl.White)
+
+		// heart rate
+		heartRectWidth := (mainViewRect.Width / 2) - float32(mainViewPadding)
+		heart_rect := rl.Rectangle{
+			X: mainViewRect.X + mainViewRect.Width - heartRectWidth,
+			Y: 100,
+			Width: heartRectWidth,
+			Height: 70,
+		}
+		rl.DrawRectangleRec(heart_rect, visualDebugColor)
+
+		rl.DrawTextureEx(
+			heart_icon_texture,
+			rl.NewVector2(
+				heart_rect.X + 10,
+				(heart_rect.Height / 2) + heart_rect.Y - (float32(heart_icon_texture.Height) * 0.05) / 2),
+			0,
+			.05,
+			rl.White)
+
+		rl.DrawText(
+			fmt.Sprintf("%d", currentHeartRate),
+			int32(heart_rect.X) + 50, (int32(heart_rect.Height) / 2) + int32(heart_rect.Y) - 20, 40,
+			rl.White)
+
+		// avg hr
+		avgHeartRateRectWidth := (mainViewRect.Width / 2) - float32(mainViewPadding)
+		avgHeartRateRect := rl.Rectangle{
+			X: mainViewRect.X + mainViewRect.Width - avgHeartRateRectWidth,
+			Y: 180,
+			Width: avgHeartRateRectWidth,
+			Height: 70,
+		}
+		rl.DrawRectangleRec(avgHeartRateRect, visualDebugColor)
+		rl.DrawText(
+			"AVG HR",
+			int32(avgHeartRateRect.X) + 10, (int32(avgHeartRateRect.Height) / 2) + int32(avgHeartRateRect.Y) - 30, 20,
+			rl.White)
+
+		rl.DrawText(
+			fmt.Sprintf("%d", 0),
+			int32(avgHeartRateRect.X) + 10, (int32(avgHeartRateRect.Height) / 2) + int32(avgHeartRateRect.Y) - 5, 40,
+			rl.White)
 
 		// ride time data
 		ride_time_rect := rl.Rectangle{
-			X: 100,
-			Y: 170,
-			Width: 220,
-			Height: 50,
+			X: mainViewRect.X,
+			Y: 260,
+			Width: mainViewRect.Width,
+			Height: 70,
 		}
-		rl.DrawRectangleRec(ride_time_rect, rl.Gray)
+		rl.DrawRectangleRec(ride_time_rect, visualDebugColor)
 		rl.DrawTextureEx(
 			time_icon_texture,
 			rl.NewVector2(
 				ride_time_rect.X + 10,
-				(power_rect.Height / 2) + ride_time_rect.Y - (float32(time_icon_texture.Height) / 2)),
+				(ride_time_rect.Height / 2) + ride_time_rect.Y - (float32(time_icon_texture.Height) / 2)),
 			0,
 			1,
-			rl.Black)
+			rl.White)
 
 		rl.DrawText(
 			convertSecondsToHHMMSS(int32(state.WorkoutElapsedTime)),
-			int32(ride_time_rect.X) + 50, (int32(ride_time_rect.Height) / 2) + int32(ride_time_rect.Y) - 10, 20,
-			rl.Black)
+			int32(ride_time_rect.X) + 50, (int32(ride_time_rect.Height) / 2) + int32(ride_time_rect.Y) - 20, 40,
+			rl.White)
     }
 
     if (state.Screen == DevicesScreen) {
